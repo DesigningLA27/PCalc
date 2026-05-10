@@ -275,7 +275,7 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
   <div style="display:none"><div id="h-mph"></div><div class="hspd-u">MPH</div></div>
 
   <!-- Interactive SVG visualization -->
-  <div class="h-viz" id="h-viz-wrap">
+  <div class="h-viz" id="h-viz-wrap" style="position:relative">
     <canvas id="home-viz"></canvas>
   </div>
 </div>
@@ -1575,6 +1575,8 @@ function vizGetPos(e){
 }
 function onVizDown(e){
   e.preventDefault();
+  // Request motion permission on first canvas touch — touchstart is valid iOS gesture context
+  requestSensorPerm();
   var p=vizGetPos(e);
   // Double-tap hole → full reset + activate M1 sensor
   if(S.dist>0){
@@ -1968,15 +1970,17 @@ function getSlope(beta,gamma){
 }
 var sensorPermGranted=false;
 var pendingM1Sensor=false;
-// Request permission on first touchend — iOS requires touchend/click, not touchmove
-document.addEventListener('touchend',function tryPermission(){
+function requestSensorPerm(){
+  // Call this from any direct touch handler — iOS requires synchronous call within gesture
+  if(sensorPermGranted)return;
   if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
     DeviceOrientationEvent.requestPermission().then(function(r){
-      if(r==='granted'){sensorPermGranted=true;}
+      sensorPermGranted=(r==='granted');
     }).catch(function(){});
-  }else{sensorPermGranted=true;}
-  document.removeEventListener('touchend',tryPermission);
-},{passive:true});
+  }else{
+    sensorPermGranted=true;
+  }
+}
 function startSensor(cb){
   var go=function(){
     sensorOn=true;
@@ -1985,13 +1989,10 @@ function startSensor(cb){
     window.addEventListener('deviceorientation',oriHandler);
     if(cb)cb();
   };
-  if(sensorPermGranted){
-    go();
-  }else if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+  if(sensorPermGranted){go();}
+  else if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
     DeviceOrientationEvent.requestPermission().then(function(r){if(r==='granted'){sensorPermGranted=true;go();}}).catch(function(){});
-  }else{
-    sensorPermGranted=true;go();
-  }
+  }else{sensorPermGranted=true;go();}
 }
 function startStabTimer(){if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];stabTimer=setInterval(function(){if(lastB===null||sensorTarget===null)return;var r=getSlope(lastB,lastGamma);stabBufLocal.push(r);var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);if(stabBufLocal.length>need)stabBufLocal.shift();if(stabBufLocal.length>=need){var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});if(Math.max.apply(null,fs2)-Math.min.apply(null,fs2)<=STAB_THR&&Math.max.apply(null,cs)-Math.min.apply(null,cs)<=STAB_THR){clearInterval(stabTimer);stabTimer=null;onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});}}},SAMPLE_MS);}
 function onStable(r){
