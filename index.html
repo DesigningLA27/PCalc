@@ -1909,7 +1909,7 @@ var sensorBreathRAF=null;
 var sensorLiveTapRuler={idx:-1,t:0};
 var pendingM1Dist=0;
 var flipWait=true;
-var requireFlipCycle=false; // after M1, M2 won't count until phone goes face-up then face-down
+var requireFlipCycle=false; // kept for compatibility, unused
 function toggleFlipWait(){
   flipWait=!flipWait;
   var sw=el('flip-wait-sw');
@@ -1960,7 +1960,6 @@ function clearSensorLive(){
   if(stabTimer){clearInterval(stabTimer);stabTimer=null;}
   if(sensorBreathRAF){cancelAnimationFrame(sensorBreathRAF);sensorBreathRAF=null;}
   stopAudioKeepAlive();
-  requireFlipCycle=false;
   drawHomeViz();
 }
 function activateSensorForZone(zi,timeout){
@@ -2024,11 +2023,6 @@ function startStabTimer(){
   stabTimer=setInterval(function(){
     if(lastB===null||sensorTarget===null)return;
     var faceDown=Math.abs(lastB||0)>90;
-    // If waiting for flip cycle: clear when face-up, only proceed once face-up seen
-    if(requireFlipCycle){
-      if(!faceDown){requireFlipCycle=false;} // phone lifted — flip cycle satisfied
-      stabBufLocal=[];return;
-    }
     // If flip-wait is on, only accumulate when face-down
     if(flipWait&&!faceDown){stabBufLocal=[];return;}
     var r=getSlope(lastB,lastGamma);
@@ -2057,13 +2051,16 @@ function onStable(r){
     pendingM1Dist=Math.max(1,Math.round(S.dist/3));
     sensorTarget=null;
     syncStoEngine();calc();
-    // Auto-chain to M2 window (60s) — require phone to be lifted first
+    // Auto-chain to M2 window (60s) — 5s delay gives user time to walk to M2 position
     sensorLive='M2';sensorTarget=1;
-    requireFlipCycle=true; // phone must go face-up before M2 starts counting
     if(sensorLiveTimer)clearTimeout(sensorLiveTimer);
     sensorLiveTimer=setTimeout(clearSensorLive,60000);
     if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];
-    startSensor(function(){startStabTimer();});
+    drawHomeViz();
+    // 5-second delay before M2 starts counting — user has time to pick up and walk
+    setTimeout(function(){
+      if(sensorTarget===1){startSensor(function(){startStabTimer();});}
+    },5000);
   } else if(zi===1){
     // M2 confirmed — ruler appears, two-zone display
     if(S.zones.length<1)S.zones=[{xs:0,fwd:0}];
