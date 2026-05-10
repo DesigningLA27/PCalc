@@ -1576,7 +1576,9 @@ function vizGetPos(e){
 }
 function onVizDown(e){
   e.preventDefault();
-  // Request motion permission on first canvas touch — touchstart is valid iOS gesture context
+  // Block all touch input when phone is face-down and sensor is recording
+  if(sensorLive&&lastB!==null&&Math.abs(lastB)>80)return;
+  // Request motion permission on first canvas touch
   requestSensorPerm();
   var p=vizGetPos(e);
   // Double-tap hole → full reset + activate M1 sensor
@@ -1668,6 +1670,7 @@ function onVizDown(e){
 }
 function onVizMove(e){
   e.preventDefault();
+  if(sensorLive&&lastB!==null&&Math.abs(lastB)>80)return;
   // Cancel long press only if finger moved more than 10px — prevents iOS tremor kills
   if(vizLongPress&&vizDrag){
     var pm=vizGetPos(e),dmx=pm.x-vizDrag.sx,dmy=pm.y-vizDrag.sy;
