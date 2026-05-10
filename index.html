@@ -407,6 +407,7 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
   <div class="sr-row"><div class="sw-col"><span class="sn">Against-grain %</span></div><div class="si-row"><button class="si-btn" onclick="ss('g-agst-pct',-1)">&#x2212;</button><input class="si" type="number" id="g-agst-pct" value="0" min="0" max="50" step="1" oninput="calc()"><button class="si-btn" onclick="ss('g-agst-pct',1)">+</button></div></div>
   <div class="sg">Sensor</div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Stability window (s)</span></div><div class="si-row"><button class="si-btn" onclick="ss('stab-win',-0.5)">&#x2212;</button><input class="si" type="number" id="stab-win" value="2.0" min="0.5" max="5.0" step="0.5"><button class="si-btn" onclick="ss('stab-win',0.5)">+</button></div></div>
+  <div class="sr-row"><div class="sw-col"><span class="sn">Wait for flip (face down)</span><div class="sh-s" style="font-size:10px;margin-top:2px">Start measuring only after phone is flipped</div></div><div class="si-row"><button id="flip-wait-sw" class="sw-sm on" onclick="toggleFlipWait()"></button></div></div>
 </div>
 </div>
 
@@ -1903,11 +1904,18 @@ async function storageGet(k){try{if(window.storage){var r=await window.storage.g
 var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=0.2,SAMPLE_MS=100;
 var lastB=null,lastGamma=null,sensorTarget=null;
 // Live sensor flow state
-var sensorLive=null;          // null | 'M1' | 'M2' | 'M3'
-var sensorLiveTimer=null;     // 60-second window timeout
-var sensorBreathRAF=null;     // breathing animation RAF handle
-var sensorLiveTapRuler={idx:-1,t:0}; // double-tap tracker for ruler lines
-var pendingM1Dist=0;          // M1 boundary stored until M2 confirmed
+var sensorLive=null;
+var sensorLiveTimer=null;
+var sensorBreathRAF=null;
+var sensorLiveTapRuler={idx:-1,t:0};
+var pendingM1Dist=0;
+var flipWait=true; // default ON — wait for face-down before stabilising
+function toggleFlipWait(){
+  flipWait=!flipWait;
+  var sw=el('flip-wait-sw');
+  if(sw)sw.className='sw-sm'+(flipWait?' on':'');
+  localStorage.setItem('pc_flipWait',JSON.stringify(flipWait));
+}
 // Global AudioContext — must be created/unlocked via user gesture on iOS
 var _ac=null;
 function getAC(){
@@ -1920,16 +1928,20 @@ document.addEventListener('touchstart',function(){getAC();},{once:true,passive:t
 function playBeep(){
   try{
     var ac=getAC();
-    function burst(t,freq,dur){
-      var o=ac.createOscillator(),g=ac.createGain();
-      o.connect(g);g.connect(ac.destination);
-      o.type='sine';o.frequency.setValueAtTime(freq,t);
-      g.gain.setValueAtTime(0.85,t);
-      g.gain.exponentialRampToValueAtTime(0.001,t+dur);
-      o.start(t);o.stop(t+dur+0.05);
+    function doBursts(){
+      function burst(t,freq,dur){
+        var o=ac.createOscillator(),g=ac.createGain();
+        o.connect(g);g.connect(ac.destination);
+        o.type='sine';o.frequency.setValueAtTime(freq,t);
+        g.gain.setValueAtTime(0.85,t);
+        g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+        o.start(t);o.stop(t+dur+0.05);
+      }
+      burst(ac.currentTime,880,0.18);
+      burst(ac.currentTime+0.22,1100,0.18);
     }
-    burst(ac.currentTime,880,0.18);
-    burst(ac.currentTime+0.22,1100,0.18);
+    if(ac.state==='suspended'){ac.resume().then(doBursts).catch(function(){});}
+    else{doBursts();}
   }catch(e){}
 }
 function clearSensorLive(){
@@ -1994,7 +2006,26 @@ function startSensor(cb){
     DeviceOrientationEvent.requestPermission().then(function(r){if(r==='granted'){sensorPermGranted=true;go();}}).catch(function(){});
   }else{sensorPermGranted=true;go();}
 }
-function startStabTimer(){if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];stabTimer=setInterval(function(){if(lastB===null||sensorTarget===null)return;var r=getSlope(lastB,lastGamma);stabBufLocal.push(r);var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);if(stabBufLocal.length>need)stabBufLocal.shift();if(stabBufLocal.length>=need){var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});if(Math.max.apply(null,fs2)-Math.min.apply(null,fs2)<=STAB_THR&&Math.max.apply(null,cs)-Math.min.apply(null,cs)<=STAB_THR){clearInterval(stabTimer);stabTimer=null;onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});}}},SAMPLE_MS);}
+function startStabTimer(){
+  if(stabTimer)clearInterval(stabTimer);
+  stabBufLocal=[];
+  stabTimer=setInterval(function(){
+    if(lastB===null||sensorTarget===null)return;
+    // If flip-wait is on, only accumulate when phone is face down
+    if(flipWait&&Math.abs(lastB||0)<=90){stabBufLocal=[];return;}
+    var r=getSlope(lastB,lastGamma);
+    stabBufLocal.push(r);
+    var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);
+    if(stabBufLocal.length>need)stabBufLocal.shift();
+    if(stabBufLocal.length>=need){
+      var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});
+      if(Math.max.apply(null,fs2)-Math.min.apply(null,fs2)<=STAB_THR&&Math.max.apply(null,cs)-Math.min.apply(null,cs)<=STAB_THR){
+        clearInterval(stabTimer);stabTimer=null;
+        onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});
+      }
+    }
+  },SAMPLE_MS);
+}
 function onStable(r){
   if(navigator.vibrate)navigator.vibrate([60,30,60]);
   playBeep();
@@ -2013,7 +2044,7 @@ function onStable(r){
     if(sensorLiveTimer)clearTimeout(sensorLiveTimer);
     sensorLiveTimer=setTimeout(clearSensorLive,60000);
     if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];
-    startStabTimer();
+    startSensor(function(){startStabTimer();});
   } else if(zi===1){
     // M2 confirmed — ruler appears, two-zone display
     if(S.zones.length<1)S.zones=[{xs:0,fwd:0}];
@@ -2040,6 +2071,7 @@ function onStable(r){
 // ── Init ──────────────────────────────────────────────────────────────────────
 storageGet('theme').then(function(v){if(v===false){lightMode=false;document.body.style.background='#011825';}});
 storageGet('diffAdj').then(function(v){if(v===false){diffAdj=false;var sw=el('diff-adj-sw');if(sw)sw.className='sw-sm';}});
+var _fw=localStorage.getItem('pc_flipWait');if(_fw!==null){flipWait=JSON.parse(_fw);var fws=el('flip-wait-sw');if(fws)fws.className='sw-sm'+(flipWait?' on':'');}
 loadRound().then(function(){renderRoundLog();});
 updateHcpDisplay();
 TABS.forEach(function(t){var d=el('s-'+t);if(d)d.className='tab'+(t==='home'?' on':'');});
