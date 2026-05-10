@@ -1903,45 +1903,55 @@ async function storageGet(k){try{if(window.storage){var r=await window.storage.g
 // ── Sensor ────────────────────────────────────────────────────────────────────
 var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=0.2,SAMPLE_MS=100;
 var lastB=null,lastGamma=null,sensorTarget=null;
-// Live sensor flow state
 var sensorLive=null;
 var sensorLiveTimer=null;
 var sensorBreathRAF=null;
 var sensorLiveTapRuler={idx:-1,t:0};
 var pendingM1Dist=0;
-var flipWait=true; // default ON — wait for face-down before stabilising
+var flipWait=true;
+var requireFlipCycle=false; // after M1, M2 won't count until phone goes face-up then face-down
 function toggleFlipWait(){
   flipWait=!flipWait;
   var sw=el('flip-wait-sw');
   if(sw)sw.className='sw-sm'+(flipWait?' on':'');
   localStorage.setItem('pc_flipWait',JSON.stringify(flipWait));
 }
-// Global AudioContext — must be created/unlocked via user gesture on iOS
-var _ac=null;
+// ── Audio ─────────────────────────────────────────────────────────────────────
+var _ac=null,_keepAlive=null;
 function getAC(){
-  if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();
-  if(_ac.state==='suspended')_ac.resume();
+  if(!_ac){try{_ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+  if(_ac&&_ac.state==='suspended'){try{_ac.resume();}catch(e){}}
   return _ac;
 }
-// Unlock on first touch
 document.addEventListener('touchstart',function(){getAC();},{once:true,passive:true});
+function startAudioKeepAlive(){
+  // Silent oscillator connected to destination — prevents iOS from suspending AudioContext
+  try{
+    var ac=getAC();if(!ac)return;
+    if(_keepAlive)return;
+    _keepAlive=ac.createOscillator();
+    var g=ac.createGain();g.gain.setValueAtTime(0.0001,ac.currentTime);
+    _keepAlive.connect(g);g.connect(ac.destination);
+    _keepAlive.frequency.setValueAtTime(1,ac.currentTime);
+    _keepAlive.start();
+  }catch(e){}
+}
+function stopAudioKeepAlive(){
+  try{if(_keepAlive){_keepAlive.stop();_keepAlive=null;}}catch(e){}
+}
 function playBeep(){
   try{
-    var ac=getAC();
-    function doBursts(){
-      function burst(t,freq,dur){
-        var o=ac.createOscillator(),g=ac.createGain();
-        o.connect(g);g.connect(ac.destination);
-        o.type='sine';o.frequency.setValueAtTime(freq,t);
-        g.gain.setValueAtTime(0.85,t);
-        g.gain.exponentialRampToValueAtTime(0.001,t+dur);
-        o.start(t);o.stop(t+dur+0.05);
-      }
-      burst(ac.currentTime,880,0.18);
-      burst(ac.currentTime+0.22,1100,0.18);
+    var ac=getAC();if(!ac)return;
+    function burst(t,freq,dur){
+      var o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.type='sine';o.frequency.setValueAtTime(freq,t);
+      g.gain.setValueAtTime(0.85,t);
+      g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+      o.start(t);o.stop(t+dur+0.05);
     }
-    if(ac.state==='suspended'){ac.resume().then(doBursts).catch(function(){});}
-    else{doBursts();}
+    burst(ac.currentTime,880,0.18);
+    burst(ac.currentTime+0.22,1100,0.18);
   }catch(e){}
 }
 function clearSensorLive(){
@@ -1949,6 +1959,8 @@ function clearSensorLive(){
   if(sensorLiveTimer){clearTimeout(sensorLiveTimer);sensorLiveTimer=null;}
   if(stabTimer){clearInterval(stabTimer);stabTimer=null;}
   if(sensorBreathRAF){cancelAnimationFrame(sensorBreathRAF);sensorBreathRAF=null;}
+  stopAudioKeepAlive();
+  requireFlipCycle=false;
   drawHomeViz();
 }
 function activateSensorForZone(zi,timeout){
@@ -1957,9 +1969,9 @@ function activateSensorForZone(zi,timeout){
   if(stabTimer){clearInterval(stabTimer);stabTimer=null;}
   sensorLive=zi===0?'M1':zi===1?'M2':'M3';
   sensorTarget=zi;
+  startAudioKeepAlive(); // keep AudioContext alive for the duration
   startSensor(function(){startStabTimer();});
   if(timeout){sensorLiveTimer=setTimeout(clearSensorLive,timeout);}
-  // Start breathing animation loop
   function breathTick(){
     if(!sensorLive){sensorBreathRAF=null;return;}
     drawHomeViz();
@@ -2011,8 +2023,14 @@ function startStabTimer(){
   stabBufLocal=[];
   stabTimer=setInterval(function(){
     if(lastB===null||sensorTarget===null)return;
-    // If flip-wait is on, only accumulate when phone is face down
-    if(flipWait&&Math.abs(lastB||0)<=90){stabBufLocal=[];return;}
+    var faceDown=Math.abs(lastB||0)>90;
+    // If waiting for flip cycle: clear when face-up, only proceed once face-up seen
+    if(requireFlipCycle){
+      if(!faceDown){requireFlipCycle=false;} // phone lifted — flip cycle satisfied
+      stabBufLocal=[];return;
+    }
+    // If flip-wait is on, only accumulate when face-down
+    if(flipWait&&!faceDown){stabBufLocal=[];return;}
     var r=getSlope(lastB,lastGamma);
     stabBufLocal.push(r);
     var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);
@@ -2039,8 +2057,9 @@ function onStable(r){
     pendingM1Dist=Math.max(1,Math.round(S.dist/3));
     sensorTarget=null;
     syncStoEngine();calc();
-    // Auto-chain to M2 window (60s)
+    // Auto-chain to M2 window (60s) — require phone to be lifted first
     sensorLive='M2';sensorTarget=1;
+    requireFlipCycle=true; // phone must go face-up before M2 starts counting
     if(sensorLiveTimer)clearTimeout(sensorLiveTimer);
     sensorLiveTimer=setTimeout(clearSensorLive,60000);
     if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];
