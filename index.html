@@ -1576,9 +1576,7 @@ function vizGetPos(e){
 }
 function onVizDown(e){
   e.preventDefault();
-  // Block all touch input when phone is face-down and sensor is recording
-  if(sensorLive&&lastB!==null&&Math.abs(lastB)>80)return;
-  // Request motion permission on first canvas touch
+  if(sensorLive)return; // block all interaction while measuring
   requestSensorPerm();
   var p=vizGetPos(e);
   // Double-tap hole → full reset + activate M1 sensor
@@ -1670,7 +1668,7 @@ function onVizDown(e){
 }
 function onVizMove(e){
   e.preventDefault();
-  if(sensorLive&&lastB!==null&&Math.abs(lastB)>80)return;
+  if(sensorLive)return;
   // Cancel long press only if finger moved more than 10px — prevents iOS tremor kills
   if(vizLongPress&&vizDrag){
     var pm=vizGetPos(e),dmx=pm.x-vizDrag.sx,dmy=pm.y-vizDrag.sy;
@@ -1945,16 +1943,20 @@ function stopAudioKeepAlive(){
 function playBeep(){
   try{
     var ac=getAC();if(!ac)return;
-    function burst(t,freq,dur){
-      var o=ac.createOscillator(),g=ac.createGain();
-      o.connect(g);g.connect(ac.destination);
-      o.type='sine';o.frequency.setValueAtTime(freq,t);
-      g.gain.setValueAtTime(0.85,t);
-      g.gain.exponentialRampToValueAtTime(0.001,t+dur);
-      o.start(t);o.stop(t+dur+0.05);
+    function doBursts(){
+      function burst(t,freq,dur){
+        var o=ac.createOscillator(),g=ac.createGain();
+        o.connect(g);g.connect(ac.destination);
+        o.type='sine';o.frequency.setValueAtTime(freq,t);
+        g.gain.setValueAtTime(0.85,t);
+        g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+        o.start(t);o.stop(t+dur+0.05);
+      }
+      burst(ac.currentTime,880,0.18);
+      burst(ac.currentTime+0.22,1100,0.18);
     }
-    burst(ac.currentTime,880,0.18);
-    burst(ac.currentTime+0.22,1100,0.18);
+    if(ac.state!=='running'){ac.resume().then(doBursts).catch(function(){});}
+    else{doBursts();}
   }catch(e){}
 }
 function clearSensorLive(){
