@@ -1901,7 +1901,7 @@ async function storageSet(k,v){try{if(window.storage)await window.storage.set(k,
 async function storageGet(k){try{if(window.storage){var r=await window.storage.get(k);return r?JSON.parse(r.value):null;}var s=localStorage.getItem('pc_'+k);return s?JSON.parse(s):null;}catch(e){return null;}}
 
 // ── Sensor ────────────────────────────────────────────────────────────────────
-var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=0.8,SAMPLE_MS=100;
+var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=3.0,SAMPLE_MS=100;
 var lastB=null,lastGamma=null,sensorTarget=null;
 // Live sensor flow state
 var sensorLive=null;
@@ -2017,12 +2017,11 @@ function startStabTimer(){
     stabBufLocal.push(r);
     var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);
     if(stabBufLocal.length>need)stabBufLocal.shift();
+    // Confirm once we have enough samples — just average, no stability check
     if(stabBufLocal.length>=need){
+      clearInterval(stabTimer);stabTimer=null;
       var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});
-      if(Math.max.apply(null,fs2)-Math.min.apply(null,fs2)<=STAB_THR&&Math.max.apply(null,cs)-Math.min.apply(null,cs)<=STAB_THR){
-        clearInterval(stabTimer);stabTimer=null;
-        onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});
-      }
+      onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});
     }
   },SAMPLE_MS);
 }
