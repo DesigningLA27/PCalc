@@ -1360,10 +1360,11 @@ function vDrawPuttPath(a){
   var maxOff=vizW*0.32;
   var aOff=Math.min(Math.max((a/12)*vizSc*1.8,-maxOff),maxOff);
   var pathBot=fy(S.dist);
+  // Same formula, peak flipped to hole end (top): sq=sqrt(u) instead of sqrt(1-u)
   // Filled shape
   vizCtx.beginPath();
   for(var i=0;i<=60;i++){
-    var u=i/60,sq=Math.sqrt(Math.max(0,1-u)),lf=2*(1-sq)*sq;
+    var u=i/60,sq=Math.sqrt(Math.max(0,u)),lf=2*(1-sq)*sq;
     vizCtx.lineTo(vizLx+aOff*lf,vizHy+u*(pathBot-vizHy));
   }
   vizCtx.lineTo(vizLx,vizHy);vizCtx.closePath();
@@ -1371,7 +1372,7 @@ function vDrawPuttPath(a){
   // Path line
   vizCtx.beginPath();
   for(var i=0;i<=60;i++){
-    var u=i/60,sq=Math.sqrt(Math.max(0,1-u)),lf=2*(1-sq)*sq;
+    var u=i/60,sq=Math.sqrt(Math.max(0,u)),lf=2*(1-sq)*sq;
     if(i===0)vizCtx.moveTo(vizLx+aOff*lf,vizHy+u*(pathBot-vizHy));
     else vizCtx.lineTo(vizLx+aOff*lf,vizHy+u*(pathBot-vizHy));
   }
