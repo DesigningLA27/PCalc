@@ -4,14 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>PuttCalc</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=M+PLUS+Rounded+1c:wght@900&family=Barlow+Condensed:ital,wght@0,600;0,700;0,900;1,400;1,600;1,900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;background:#023047}
+html,body{width:100%;height:100%;overflow:hidden;background:#daeaf4}
 body{font-family:'DM Sans',sans-serif;color:#0d2233}
-.ios-status{display:none}
 /* On actual iPhone — fill the screen exactly */
 .app{display:flex;flex-direction:column;width:100%;height:100dvh;max-height:100dvh;overflow:hidden;background:#daeaf4;position:relative}
 /* On desktop — show iPhone 16 Pro Max frame */
@@ -46,7 +45,7 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
 .nb-lbl{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;letter-spacing:.02em}
 
 /* ── Home top stats ── */
-.h-top{display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 10px 5px;padding-top:calc(10px + env(safe-area-inset-top));gap:2px;flex-shrink:0;background:#023047;border-bottom:5px solid #8ECAE6}
+.h-top{display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 10px 5px;gap:2px;flex-shrink:0;background:#023047;border-bottom:5px solid #8ECAE6}
 .hc{text-align:center;padding:4px 2px}
 .hc-lbl{font-size:9px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:1px;font-family:'DM Mono',monospace}
 .hc-val{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-style:italic;font-size:44px;line-height:1;color:#8ECAE6;letter-spacing:.02em;cursor:pointer;user-select:none}
@@ -275,7 +274,7 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
   <div style="display:none"><div id="h-mph"></div><div class="hspd-u">MPH</div></div>
 
   <!-- Interactive SVG visualization -->
-  <div class="h-viz" id="h-viz-wrap" style="position:relative">
+  <div class="h-viz" id="h-viz-wrap">
     <canvas id="home-viz"></canvas>
   </div>
 </div>
@@ -407,7 +406,6 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
   <div class="sr-row"><div class="sw-col"><span class="sn">Against-grain %</span></div><div class="si-row"><button class="si-btn" onclick="ss('g-agst-pct',-1)">&#x2212;</button><input class="si" type="number" id="g-agst-pct" value="0" min="0" max="50" step="1" oninput="calc()"><button class="si-btn" onclick="ss('g-agst-pct',1)">+</button></div></div>
   <div class="sg">Sensor</div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Stability window (s)</span></div><div class="si-row"><button class="si-btn" onclick="ss('stab-win',-0.5)">&#x2212;</button><input class="si" type="number" id="stab-win" value="2.0" min="0.5" max="5.0" step="0.5"><button class="si-btn" onclick="ss('stab-win',0.5)">+</button></div></div>
-  <div class="sr-row"><div class="sw-col"><span class="sn">Wait for flip (face down)</span><div class="sh-s" style="font-size:10px;margin-top:2px">Start measuring only after phone is flipped</div></div><div class="si-row"><button id="flip-wait-sw" class="sw-sm on" onclick="toggleFlipWait()"></button></div></div>
 </div>
 </div>
 
@@ -1576,11 +1574,10 @@ function vizGetPos(e){
 }
 function onVizDown(e){
   e.preventDefault();
-  if(sensorLive)return; // block all interaction while measuring
   requestSensorPerm();
   var p=vizGetPos(e);
-  // Double-tap hole → full reset + activate M1 sensor
-  if(S.dist>0){
+  // Double-tap hole → reset (blocked when sensor live to prevent phantom taps)
+  if(S.dist>0&&!sensorLive){
     var dxH=p.x-vizLx,dyH=p.y-vizHy,distH=Math.sqrt(dxH*dxH+dyH*dyH);
     var now=Date.now();
     if(distH<32){
@@ -1591,7 +1588,6 @@ function onVizDown(e){
         roOverride=-1;roIdx=0;el('runout').value=-1;
         el('dist').value=0;updateFlipClock(0);
         localStorage.removeItem('pc_dragged');localStorage.removeItem('pc_snapped');localStorage.removeItem('pc_adjusted');
-        pendingM1Sensor=false;
         syncStoEngine();calc();drawHomeViz();
         if(navigator.vibrate)navigator.vibrate([30,20,30]);
         activateSensorForZone(0); // M1 — no timeout, wait indefinitely
@@ -1668,7 +1664,6 @@ function onVizDown(e){
 }
 function onVizMove(e){
   e.preventDefault();
-  if(sensorLive)return;
   // Cancel long press only if finger moved more than 10px — prevents iOS tremor kills
   if(vizLongPress&&vizDrag){
     var pm=vizGetPos(e),dmx=pm.x-vizDrag.sx,dmy=pm.y-vizDrag.sy;
@@ -1682,9 +1677,9 @@ function onVizMove(e){
     ballLocked=false;
     if(localStorage.getItem('pc_snapped'))localStorage.setItem('pc_adjusted','1');
     var nd=clamp(Math.round((vizDrag.sv+(p.y-vizDrag.sy)/vizSc)),1,80);
-    // First drag from zero → set flag; sensor activates on touchend (onVizUp) for iOS permission
+    // First drag from zero → activate M1 sensor immediately while still dragging
     if(vizDrag.sv===0&&nd>0&&!sensorLive){
-      pendingM1Sensor=true;
+      activateSensorForZone(0);
     }
     if(nd!==S.dist){S.dist=nd;drumDist=nd;el('dist').value=nd;updateFlipClock(nd);}
     drawHomeViz();autoSnapViz();return;
@@ -1717,11 +1712,6 @@ function onVizMove(e){
 function onVizUp(e){
   if(vizLongPress){clearTimeout(vizLongPress);vizLongPress=null;}
   if(vizDrag){vizDrag=null;calc();}
-  // Activate M1 sensor here (touchend) — iOS requestPermission requires touchend/click
-  if(pendingM1Sensor&&S.dist>0&&!sensorLive){
-    pendingM1Sensor=false;
-    activateSensorForZone(0);
-  }
 }
 
 // ── Zone management ───────────────────────────────────────────────────────────
@@ -1904,60 +1894,35 @@ async function storageGet(k){try{if(window.storage){var r=await window.storage.g
 // ── Sensor ────────────────────────────────────────────────────────────────────
 var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=0.2,SAMPLE_MS=100;
 var lastB=null,lastGamma=null,sensorTarget=null;
-var sensorLive=null;
-var sensorLiveTimer=null;
-var sensorBreathRAF=null;
-var sensorLiveTapRuler={idx:-1,t:0};
-var pendingM1Dist=0;
-var flipWait=true;
-var requireFlipCycle=false; // kept for compatibility, unused
-function toggleFlipWait(){
-  flipWait=!flipWait;
-  var sw=el('flip-wait-sw');
-  if(sw)sw.className='sw-sm'+(flipWait?' on':'');
-  localStorage.setItem('pc_flipWait',JSON.stringify(flipWait));
-}
-// ── Audio ─────────────────────────────────────────────────────────────────────
+var sensorLive=null,sensorLiveTimer=null,sensorBreathRAF=null;
+var sensorLiveTapRuler={idx:-1,t:0},pendingM1Dist=0,sensorPermGranted=false;
 var _ac=null,_keepAlive=null;
-function getAC(){
-  if(!_ac){try{_ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
-  if(_ac&&_ac.state==='suspended'){try{_ac.resume();}catch(e){}}
-  return _ac;
-}
-document.addEventListener('touchstart',function(){getAC();},{once:true,passive:true});
+function getAC(){if(!_ac){try{_ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return _ac;}
 function startAudioKeepAlive(){
-  // Silent oscillator connected to destination — prevents iOS from suspending AudioContext
-  try{
-    var ac=getAC();if(!ac)return;
-    if(_keepAlive)return;
-    _keepAlive=ac.createOscillator();
-    var g=ac.createGain();g.gain.setValueAtTime(0.0001,ac.currentTime);
+  try{var ac=getAC();if(!ac||_keepAlive)return;
+    _keepAlive=ac.createOscillator();var g=ac.createGain();
+    g.gain.setValueAtTime(0.00001,ac.currentTime);
     _keepAlive.connect(g);g.connect(ac.destination);
-    _keepAlive.frequency.setValueAtTime(1,ac.currentTime);
-    _keepAlive.start();
+    _keepAlive.frequency.setValueAtTime(1,ac.currentTime);_keepAlive.start();
   }catch(e){}
 }
-function stopAudioKeepAlive(){
-  try{if(_keepAlive){_keepAlive.stop();_keepAlive=null;}}catch(e){}
-}
+function stopAudioKeepAlive(){try{if(_keepAlive){_keepAlive.stop();_keepAlive=null;}}catch(e){}}
 function playBeep(){
-  try{
-    var ac=getAC();if(!ac)return;
+  try{var ac=getAC();if(!ac)return;
     function doBursts(){
-      function burst(t,freq,dur){
-        var o=ac.createOscillator(),g=ac.createGain();
-        o.connect(g);g.connect(ac.destination);
-        o.type='sine';o.frequency.setValueAtTime(freq,t);
-        g.gain.setValueAtTime(0.85,t);
-        g.gain.exponentialRampToValueAtTime(0.001,t+dur);
-        o.start(t);o.stop(t+dur+0.05);
-      }
-      burst(ac.currentTime,880,0.18);
-      burst(ac.currentTime+0.22,1100,0.18);
+      function burst(t,f,d){var o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.type='sine';o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(0.85,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);o.start(t);o.stop(t+d+0.05);}
+      burst(ac.currentTime,880,0.18);burst(ac.currentTime+0.22,1100,0.18);
     }
-    if(ac.state!=='running'){ac.resume().then(doBursts).catch(function(){});}
-    else{doBursts();}
+    if(ac.state!=='running'){ac.resume().then(doBursts).catch(function(){});}else{doBursts();}
   }catch(e){}
+}
+function requestSensorPerm(){
+  var ac=getAC();if(ac&&ac.state==='suspended')ac.resume().catch(function(){});
+  startAudioKeepAlive();
+  if(sensorPermGranted)return;
+  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().then(function(r){sensorPermGranted=(r==='granted');}).catch(function(){});
+  }else{sensorPermGranted=true;}
 }
 function clearSensorLive(){
   sensorLive=null;sensorTarget=null;
@@ -1973,9 +1938,9 @@ function activateSensorForZone(zi,timeout){
   if(stabTimer){clearInterval(stabTimer);stabTimer=null;}
   sensorLive=zi===0?'M1':zi===1?'M2':'M3';
   sensorTarget=zi;
-  startAudioKeepAlive(); // keep AudioContext alive for the duration
   startSensor(function(){startStabTimer();});
   if(timeout){sensorLiveTimer=setTimeout(clearSensorLive,timeout);}
+  // Start breathing animation loop
   function breathTick(){
     if(!sensorLive){sensorBreathRAF=null;return;}
     drawHomeViz();
@@ -1983,66 +1948,14 @@ function activateSensorForZone(zi,timeout){
   }
   sensorBreathRAF=requestAnimationFrame(breathTick);
 }
-function getSlope(beta,gamma){
-  var fd=Math.abs(beta)>90;
-  var fwd,cross;
-  if(fd){
-    // Face down: sin(beta) is continuous at ±180 — no wrap artifacts
-    fwd=parseFloat((-Math.sin(beta*Math.PI/180)*100).toFixed(1));
-    cross=parseFloat((Math.tan(gamma*Math.PI/180)*100).toFixed(1)); // sign inverts face-down
-  }else{
-    fwd=parseFloat((Math.tan(beta*Math.PI/180)*100).toFixed(1));
-    cross=parseFloat((-Math.tan(gamma*Math.PI/180)*100).toFixed(1));
-  }
-  return{fwd:fwd,cross:cross};
-}
-var sensorPermGranted=false;
-var pendingM1Sensor=false;
-function requestSensorPerm(){
-  // Call this from any direct touch handler — iOS requires synchronous call within gesture
-  if(sensorPermGranted)return;
-  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
-    DeviceOrientationEvent.requestPermission().then(function(r){
-      sensorPermGranted=(r==='granted');
-    }).catch(function(){});
-  }else{
-    sensorPermGranted=true;
-  }
-}
+function getSlope(beta,gamma){var fd=Math.abs(beta)>90,sgn=fd?-1:1,db=fd?(Math.abs(beta)-180)*Math.sign(beta):beta;return{fwd:parseFloat((Math.tan(db*Math.PI/180)*100*sgn).toFixed(1)),cross:parseFloat((-Math.tan(gamma*Math.PI/180)*100).toFixed(1))};}
 function startSensor(cb){
-  var go=function(){
-    sensorOn=true;
-    if(oriHandler)window.removeEventListener('deviceorientation',oriHandler);
-    oriHandler=function(e){if(e.beta===null)return;lastB=e.beta||0;lastGamma=e.gamma||0;};
-    window.addEventListener('deviceorientation',oriHandler);
-    if(cb)cb();
-  };
+  var go=function(){sensorOn=true;if(oriHandler)window.removeEventListener('deviceorientation',oriHandler);oriHandler=function(e){if(e.beta===null)return;lastB=e.beta||0;lastGamma=e.gamma||0;};window.addEventListener('deviceorientation',oriHandler);if(cb)cb();};
   if(sensorPermGranted){go();}
-  else if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
-    DeviceOrientationEvent.requestPermission().then(function(r){if(r==='granted'){sensorPermGranted=true;go();}}).catch(function(){});
-  }else{sensorPermGranted=true;go();}
+  else if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){DeviceOrientationEvent.requestPermission().then(function(r){if(r==='granted'){sensorPermGranted=true;go();}}).catch(function(){});}
+  else{sensorPermGranted=true;go();}
 }
-function startStabTimer(){
-  if(stabTimer)clearInterval(stabTimer);
-  stabBufLocal=[];
-  stabTimer=setInterval(function(){
-    if(lastB===null||sensorTarget===null)return;
-    var faceDown=Math.abs(lastB||0)>90;
-    // If flip-wait is on, only accumulate when face-down
-    if(flipWait&&!faceDown){stabBufLocal=[];return;}
-    var r=getSlope(lastB,lastGamma);
-    stabBufLocal.push(r);
-    var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);
-    if(stabBufLocal.length>need)stabBufLocal.shift();
-    if(stabBufLocal.length>=need){
-      var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});
-      if(Math.max.apply(null,fs2)-Math.min.apply(null,fs2)<=STAB_THR&&Math.max.apply(null,cs)-Math.min.apply(null,cs)<=STAB_THR){
-        clearInterval(stabTimer);stabTimer=null;
-        onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});
-      }
-    }
-  },SAMPLE_MS);
-}
+function startStabTimer(){if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];stabTimer=setInterval(function(){if(lastB===null||sensorTarget===null)return;var r=getSlope(lastB,lastGamma);stabBufLocal.push(r);var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);if(stabBufLocal.length>need)stabBufLocal.shift();if(stabBufLocal.length>=need){var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});if(Math.max.apply(null,fs2)-Math.min.apply(null,fs2)<=STAB_THR&&Math.max.apply(null,cs)-Math.min.apply(null,cs)<=STAB_THR){clearInterval(stabTimer);stabTimer=null;onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});}}},SAMPLE_MS);}
 function onStable(r){
   if(navigator.vibrate)navigator.vibrate([60,30,60]);
   playBeep();
@@ -2055,14 +1968,12 @@ function onStable(r){
     m1Captured=true;S.m1Active=true;zone=false;zone2=false;
     pendingM1Dist=Math.max(1,Math.round(S.dist/3));
     sensorTarget=null;
-    syncStoEngine();calc();
-    // Auto-chain to M2 window (60s) — 5s delay gives user time to walk to M2 position
+    syncStoEngine();calc();drawHomeViz();
+    // Auto-chain to M2 — 5s grace before counting starts
     sensorLive='M2';sensorTarget=1;
     if(sensorLiveTimer)clearTimeout(sensorLiveTimer);
     sensorLiveTimer=setTimeout(clearSensorLive,60000);
     if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];
-    drawHomeViz();
-    // 5-second delay before M2 starts counting — user has time to pick up and walk
     setTimeout(function(){
       if(sensorTarget===1){startSensor(function(){startStabTimer();});}
     },5000);
@@ -2092,7 +2003,6 @@ function onStable(r){
 // ── Init ──────────────────────────────────────────────────────────────────────
 storageGet('theme').then(function(v){if(v===false){lightMode=false;document.body.style.background='#011825';}});
 storageGet('diffAdj').then(function(v){if(v===false){diffAdj=false;var sw=el('diff-adj-sw');if(sw)sw.className='sw-sm';}});
-var _fw=localStorage.getItem('pc_flipWait');if(_fw!==null){flipWait=JSON.parse(_fw);var fws=el('flip-wait-sw');if(fws)fws.className='sw-sm'+(flipWait?' on':'');}
 loadRound().then(function(){renderRoundLog();});
 updateHcpDisplay();
 TABS.forEach(function(t){var d=el('s-'+t);if(d)d.className='tab'+(t==='home'?' on':'');});
