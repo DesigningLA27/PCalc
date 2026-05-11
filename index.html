@@ -1192,12 +1192,11 @@ function drawHomeViz(){
   vDrawTicks(dist,scaleMax);
   vDrawMainLine();
   if(S.m1Active)vDrawZones(l);
-  vDrawPuttPath(a);
-  vDrawAimLine(a);
+  if(m1Captured){vDrawPuttPath(a);vDrawAimLine(a);}
   vDrawHole();
   vDrawRunOutArc();
   vDrawBall();
-  if(S.m1Active)vDrawDots(); // always on top
+  if(S.m1Active)vDrawDots();
 }
 
 function vDrawTicks(dist,scaleMax){
