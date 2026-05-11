@@ -1180,14 +1180,7 @@ function drawHomeViz(){
   if(S.m1Active)vDrawZones(l);
   vDrawPuttPath(a);
   vDrawAimLine(a);
-  // Debug: show beta value when sensor live
-  if(sensorLive){
-    vizCtx.fillStyle='rgba(0,0,0,0.6)';
-    vizCtx.fillRect(4,4,120,22);
-    vizCtx.fillStyle='#fff';
-    vizCtx.font='bold 13px monospace';
-    vizCtx.fillText('β='+(lastB!==null?lastB.toFixed(1):'null')+' γ='+(lastGamma!==null?lastGamma.toFixed(1):'null'),8,19);
-  }
+  vDrawHole();
   vDrawRunOutArc();
   vDrawBall();
   if(S.m1Active)vDrawDots(); // always on top
@@ -1581,10 +1574,9 @@ function vizGetPos(e){
 }
 function onVizDown(e){
   e.preventDefault();
-  requestSensorPerm();
   var p=vizGetPos(e);
-  // Double-tap hole → reset (blocked when sensor live to prevent phantom taps)
-  if(S.dist>0&&!sensorLive){
+  // Double-tap hole → full reset + activate M1 sensor
+  if(S.dist>0){
     var dxH=p.x-vizLx,dyH=p.y-vizHy,distH=Math.sqrt(dxH*dxH+dyH*dyH);
     var now=Date.now();
     if(distH<32){
@@ -1595,10 +1587,8 @@ function onVizDown(e){
         roOverride=-1;roIdx=0;el('runout').value=-1;
         el('dist').value=0;updateFlipClock(0);
         localStorage.removeItem('pc_dragged');localStorage.removeItem('pc_snapped');localStorage.removeItem('pc_adjusted');
-        pendingM1Sensor=false;
         syncStoEngine();calc();drawHomeViz();
         if(navigator.vibrate)navigator.vibrate([30,20,30]);
-        var ac=getAC();if(ac&&ac.state!=='running')ac.resume().catch(function(){});
         activateSensorForZone(0); // M1 — no timeout, wait indefinitely
         return;
       }
@@ -1686,9 +1676,9 @@ function onVizMove(e){
     ballLocked=false;
     if(localStorage.getItem('pc_snapped'))localStorage.setItem('pc_adjusted','1');
     var nd=clamp(Math.round((vizDrag.sv+(p.y-vizDrag.sy)/vizSc)),1,80);
-    // Set flag — sensor activates in onVizUp (touchend = valid iOS gesture)
+    // First drag from zero → activate M1 sensor immediately while still dragging
     if(vizDrag.sv===0&&nd>0&&!sensorLive){
-      pendingM1Sensor=true;
+      activateSensorForZone(0);
     }
     if(nd!==S.dist){S.dist=nd;drumDist=nd;el('dist').value=nd;updateFlipClock(nd);}
     drawHomeViz();autoSnapViz();return;
@@ -1721,13 +1711,6 @@ function onVizMove(e){
 function onVizUp(e){
   if(vizLongPress){clearTimeout(vizLongPress);vizLongPress=null;}
   if(vizDrag){vizDrag=null;calc();}
-  // Activate M1 sensor here — touchend is valid iOS gesture for requestPermission
-  if(pendingM1Sensor&&S.dist>0&&!sensorLive){
-    pendingM1Sensor=false;
-    // Resume AC synchronously while still inside touchend gesture — iOS requires this
-    var ac=getAC();if(ac&&ac.state!=='running')ac.resume().catch(function(){});
-    activateSensorForZone(0);
-  }
 }
 
 // ── Zone management ───────────────────────────────────────────────────────────
@@ -1908,44 +1891,47 @@ async function storageSet(k,v){try{if(window.storage)await window.storage.set(k,
 async function storageGet(k){try{if(window.storage){var r=await window.storage.get(k);return r?JSON.parse(r.value):null;}var s=localStorage.getItem('pc_'+k);return s?JSON.parse(s):null;}catch(e){return null;}}
 
 // ── Sensor ────────────────────────────────────────────────────────────────────
-var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=0.2,SAMPLE_MS=100;
+var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=0.8,SAMPLE_MS=100;
 var lastB=null,lastGamma=null,sensorTarget=null;
-var sensorLive=null,sensorLiveTimer=null,sensorBreathRAF=null;
-var sensorLiveTapRuler={idx:-1,t:0},pendingM1Dist=0,sensorPermGranted=false,pendingM1Sensor=false;
-var _ac=null,_keepAlive=null;
-function getAC(){if(!_ac){try{_ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return _ac;}
-function startAudioKeepAlive(){
-  try{var ac=getAC();if(!ac||_keepAlive)return;
-    _keepAlive=ac.createOscillator();var g=ac.createGain();
-    g.gain.setValueAtTime(0.00001,ac.currentTime);
-    _keepAlive.connect(g);g.connect(ac.destination);
-    _keepAlive.frequency.setValueAtTime(1,ac.currentTime);_keepAlive.start();
-  }catch(e){}
+// Live sensor flow state
+var sensorLive=null;          // null | 'M1' | 'M2' | 'M3'
+var sensorLiveTimer=null;     // 60-second window timeout
+var sensorBreathRAF=null;     // breathing animation RAF handle
+var sensorLiveTapRuler={idx:-1,t:0}; // double-tap tracker for ruler lines
+var pendingM1Dist=0;          // M1 boundary stored until M2 confirmed
+var _ac=null;
+function getAC(){
+  if(!_ac){try{_ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+  return _ac;
 }
-function stopAudioKeepAlive(){try{if(_keepAlive){_keepAlive.stop();_keepAlive=null;}}catch(e){}}
-function playBeep(){
-  try{var ac=getAC();if(!ac)return;
-    function doBursts(){
-      function burst(t,f,d){var o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.type='sine';o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(0.85,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);o.start(t);o.stop(t+d+0.05);}
-      burst(ac.currentTime,880,0.18);burst(ac.currentTime+0.22,1100,0.18);
-    }
-    if(ac.state!=='running'){ac.resume().then(doBursts).catch(function(){});}else{doBursts();}
-  }catch(e){}
-}
-function requestSensorPerm(){
+// Unlock AC on first touch
+document.addEventListener('touchstart',function(){
   var ac=getAC();if(ac&&ac.state==='suspended')ac.resume().catch(function(){});
-  startAudioKeepAlive();
-  if(sensorPermGranted)return;
-  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
-    DeviceOrientationEvent.requestPermission().then(function(r){sensorPermGranted=(r==='granted');}).catch(function(){});
-  }else{sensorPermGranted=true;}
+},{once:true,passive:true});
+function playBeep(){
+  try{
+    var ac=getAC();if(!ac)return;
+    var play=function(){
+      var t=ac.currentTime;
+      function burst(st,freq,dur){
+        var o=ac.createOscillator(),g=ac.createGain();
+        o.connect(g);g.connect(ac.destination);
+        o.type='sine';o.frequency.setValueAtTime(freq,st);
+        g.gain.setValueAtTime(0.85,st);
+        g.gain.exponentialRampToValueAtTime(0.001,st+dur);
+        o.start(st);o.stop(st+dur+0.05);
+      }
+      burst(t,880,0.18);burst(t+0.22,1100,0.18);
+    };
+    if(ac.state==='running'){play();}
+    else{ac.resume().then(function(){setTimeout(play,50);}).catch(function(){});}
+  }catch(e){}
 }
 function clearSensorLive(){
   sensorLive=null;sensorTarget=null;
   if(sensorLiveTimer){clearTimeout(sensorLiveTimer);sensorLiveTimer=null;}
   if(stabTimer){clearInterval(stabTimer);stabTimer=null;}
   if(sensorBreathRAF){cancelAnimationFrame(sensorBreathRAF);sensorBreathRAF=null;}
-  stopAudioKeepAlive();
   drawHomeViz();
 }
 function activateSensorForZone(zi,timeout){
@@ -1965,12 +1951,7 @@ function activateSensorForZone(zi,timeout){
   sensorBreathRAF=requestAnimationFrame(breathTick);
 }
 function getSlope(beta,gamma){var fd=Math.abs(beta)>90,sgn=fd?-1:1,db=fd?(Math.abs(beta)-180)*Math.sign(beta):beta;return{fwd:parseFloat((Math.tan(db*Math.PI/180)*100*sgn).toFixed(1)),cross:parseFloat((-Math.tan(gamma*Math.PI/180)*100).toFixed(1))};}
-function startSensor(cb){
-  var go=function(){sensorOn=true;if(oriHandler)window.removeEventListener('deviceorientation',oriHandler);oriHandler=function(e){if(e.beta===null)return;lastB=e.beta||0;lastGamma=e.gamma||0;};window.addEventListener('deviceorientation',oriHandler);if(cb)cb();};
-  if(sensorPermGranted){go();}
-  else if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){DeviceOrientationEvent.requestPermission().then(function(r){if(r==='granted'){sensorPermGranted=true;go();}}).catch(function(){});}
-  else{sensorPermGranted=true;go();}
-}
+function startSensor(cb){var go=function(){sensorOn=true;if(oriHandler)window.removeEventListener('deviceorientation',oriHandler);oriHandler=function(e){if(e.beta===null)return;lastB=e.beta||0;lastGamma=e.gamma||0;};window.addEventListener('deviceorientation',oriHandler);if(cb)cb();};if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){DeviceOrientationEvent.requestPermission().then(function(r){if(r==='granted')go();}).catch(function(){});}else go();}
 function startStabTimer(){if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];stabTimer=setInterval(function(){if(lastB===null||sensorTarget===null)return;var r=getSlope(lastB,lastGamma);stabBufLocal.push(r);var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);if(stabBufLocal.length>need)stabBufLocal.shift();if(stabBufLocal.length>=need){var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});if(Math.max.apply(null,fs2)-Math.min.apply(null,fs2)<=STAB_THR&&Math.max.apply(null,cs)-Math.min.apply(null,cs)<=STAB_THR){clearInterval(stabTimer);stabTimer=null;onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});}}},SAMPLE_MS);}
 function onStable(r){
   if(navigator.vibrate)navigator.vibrate([60,30,60]);
@@ -1984,15 +1965,13 @@ function onStable(r){
     m1Captured=true;S.m1Active=true;zone=false;zone2=false;
     pendingM1Dist=Math.max(1,Math.round(S.dist/3));
     sensorTarget=null;
-    syncStoEngine();calc();drawHomeViz();
-    // Auto-chain to M2 — 5s grace before counting starts
+    syncStoEngine();calc();
+    // Auto-chain to M2 window (60s)
     sensorLive='M2';sensorTarget=1;
     if(sensorLiveTimer)clearTimeout(sensorLiveTimer);
     sensorLiveTimer=setTimeout(clearSensorLive,60000);
     if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];
-    setTimeout(function(){
-      if(sensorTarget===1){startSensor(function(){startStabTimer();});}
-    },5000);
+    startStabTimer();
   } else if(zi===1){
     // M2 confirmed — ruler appears, two-zone display
     if(S.zones.length<1)S.zones=[{xs:0,fwd:0}];
