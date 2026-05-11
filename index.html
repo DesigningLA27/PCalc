@@ -278,6 +278,8 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
   <div class="h-viz" id="h-viz-wrap" style="position:relative">
     <canvas id="home-viz"></canvas>
   </div>
+  <!-- SENSOR DEBUG — remove later -->
+  <div id="sdbg" style="position:fixed;bottom:80px;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font:bold 16px monospace;padding:8px 12px;z-index:9999;text-align:center">sensor: init</div>
 </div>
 
 <!-- ══════════════════════════════════════════════════
@@ -1921,17 +1923,25 @@ function startSensorAlways(){
   oriHandler=function(e){
     lastB=e.beta!==null?e.beta:lastB;
     lastGamma=e.gamma!==null?e.gamma:lastGamma;
+    var d=el('sdbg');
+    if(d)d.textContent='B='+( lastB!==null?lastB.toFixed(1):'null')+' G='+(lastGamma!==null?lastGamma.toFixed(1):'null')+' live='+sensorLive;
   };
   window.addEventListener('deviceorientation',oriHandler);
   sensorOn=true;
+  var d=el('sdbg');if(d)d.textContent='sensor ON — waiting for events';
 }
 function requestSensorPerm(){
   if(sensorOn)return;
+  var d=el('sdbg');if(d)d.textContent='requesting permission...';
   if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
     DeviceOrientationEvent.requestPermission().then(function(r){
+      var d=el('sdbg');if(d)d.textContent='permission: '+r;
       if(r==='granted'){sensorPermGranted=true;startSensorAlways();}
-    }).catch(function(){});
-  }else{sensorPermGranted=true;startSensorAlways();}
+    }).catch(function(err){var d=el('sdbg');if(d)d.textContent='perm error: '+err;});
+  }else{
+    var d=el('sdbg');if(d)d.textContent='no permission API — starting directly';
+    sensorPermGranted=true;startSensorAlways();
+  }
 }
 // Global AudioContext — must be created/unlocked via user gesture on iOS
 var _ac=null;
