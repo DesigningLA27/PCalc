@@ -1180,7 +1180,14 @@ function drawHomeViz(){
   if(S.m1Active)vDrawZones(l);
   vDrawPuttPath(a);
   vDrawAimLine(a);
-  vDrawHole();
+  // Debug: show beta value when sensor live
+  if(sensorLive){
+    vizCtx.fillStyle='rgba(0,0,0,0.6)';
+    vizCtx.fillRect(4,4,120,22);
+    vizCtx.fillStyle='#fff';
+    vizCtx.font='bold 13px monospace';
+    vizCtx.fillText('β='+(lastB!==null?lastB.toFixed(1):'null')+' γ='+(lastGamma!==null?lastGamma.toFixed(1):'null'),8,19);
+  }
   vDrawRunOutArc();
   vDrawBall();
   if(S.m1Active)vDrawDots(); // always on top
@@ -1591,6 +1598,7 @@ function onVizDown(e){
         pendingM1Sensor=false;
         syncStoEngine();calc();drawHomeViz();
         if(navigator.vibrate)navigator.vibrate([30,20,30]);
+        var ac=getAC();if(ac&&ac.state!=='running')ac.resume().catch(function(){});
         activateSensorForZone(0); // M1 — no timeout, wait indefinitely
         return;
       }
@@ -1716,6 +1724,8 @@ function onVizUp(e){
   // Activate M1 sensor here — touchend is valid iOS gesture for requestPermission
   if(pendingM1Sensor&&S.dist>0&&!sensorLive){
     pendingM1Sensor=false;
+    // Resume AC synchronously while still inside touchend gesture — iOS requires this
+    var ac=getAC();if(ac&&ac.state!=='running')ac.resume().catch(function(){});
     activateSensorForZone(0);
   }
 }
