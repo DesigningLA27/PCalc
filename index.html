@@ -2038,18 +2038,26 @@ function startSensor(cb){
 function startStabTimer(){
   if(stabTimer)clearInterval(stabTimer);
   stabBufLocal=[];
+  var faceDownSince=null;
   stabTimer=setInterval(function(){
     if(lastB===null||sensorTarget===null)return;
-    // Only accumulate when genuinely flat face-down (>165°) — avoids mid-flip sin spikes
-    if(Math.abs(lastB||0)<165){stabBufLocal=[];return;}
+    var faceDown=Math.abs(lastB)>165;
+    if(!faceDown){stabBufLocal=[];faceDownSince=null;return;}
+    // Wait 0.5s after going face-down before collecting (settling time)
+    if(!faceDownSince){faceDownSince=Date.now();return;}
+    if(Date.now()-faceDownSince<500)return;
     var r=getSlope(lastB,lastGamma);
     stabBufLocal.push(r);
-    var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);
+    var need=Math.round(1500/SAMPLE_MS); // 1.5s of stable readings
     if(stabBufLocal.length>need)stabBufLocal.shift();
     if(stabBufLocal.length>=need){
-      clearInterval(stabTimer);stabTimer=null;
       var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});
-      onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});
+      var fRange=Math.max.apply(null,fs2)-Math.min.apply(null,fs2);
+      var cRange=Math.max.apply(null,cs)-Math.min.apply(null,cs);
+      if(fRange<=0.5&&cRange<=0.5){ // stable within 0.5%
+        clearInterval(stabTimer);stabTimer=null;
+        onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});
+      }
     }
   },SAMPLE_MS);
 }
