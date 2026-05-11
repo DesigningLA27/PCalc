@@ -1955,11 +1955,12 @@ function onSensorGateTap(){
   var gate=el('sensor-gate');
   if(gate)gate.style.display='none';
   localStorage.setItem('pc_sensorGranted','1');
+  // Unlock AudioContext in this gesture so beep works later
+  try{var ac=getAC();if(ac&&ac.state==='suspended')ac.resume().catch(function(){});}catch(e){}
   if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
     DeviceOrientationEvent.requestPermission().then(function(r){
-      var d=el('sdbg');if(d)d.textContent='permission: '+r;
       if(r==='granted'){sensorPermGranted=true;startSensorAlways();}
-    }).catch(function(err){var d=el('sdbg');if(d)d.textContent='error: '+err;});
+    }).catch(function(err){});
   }else{sensorPermGranted=true;startSensorAlways();}
 }
 // Global AudioContext — must be created/unlocked via user gesture on iOS
@@ -2039,13 +2040,12 @@ function startStabTimer(){
   stabBufLocal=[];
   stabTimer=setInterval(function(){
     if(lastB===null||sensorTarget===null)return;
-    // If flip-wait is on, only accumulate when phone is face down
-    if(flipWait&&Math.abs(lastB||0)<=90){stabBufLocal=[];return;}
+    // Only accumulate when genuinely flat face-down (>165°) — avoids mid-flip sin spikes
+    if(Math.abs(lastB||0)<165){stabBufLocal=[];return;}
     var r=getSlope(lastB,lastGamma);
     stabBufLocal.push(r);
     var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);
     if(stabBufLocal.length>need)stabBufLocal.shift();
-    // Confirm once we have enough samples — just average, no stability check
     if(stabBufLocal.length>=need){
       clearInterval(stabTimer);stabTimer=null;
       var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});
