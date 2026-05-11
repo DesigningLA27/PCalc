@@ -2060,9 +2060,10 @@ function onStable(r){
   if(zi===null)return;
   var fwd=Math.round(clamp(r.fwd,-6,6)*2)/2,xs=Math.round(clamp(r.cross,-5,5)*2)/2;
   if(zi===0){
-    // M1 confirmed — single zone covering full putt, no ruler yet
-    S.zones=[{xs:xs,fwd:fwd}];S.bounds=[];
-    m1Captured=true;S.m1Active=true;zone=false;zone2=false;
+    // Update M1 slopes only — keep ruler/bounds that autoSnapViz already set
+    if(!S.zones[0])S.zones[0]={xs:0,fwd:0};
+    S.zones[0]={xs:xs,fwd:fwd};
+    m1Captured=true;S.m1Active=true;
     pendingM1Dist=Math.max(1,Math.round(S.dist/3));
     sensorTarget=null;
     syncStoEngine();calc();drawHomeViz();
