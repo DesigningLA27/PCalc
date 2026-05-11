@@ -1588,6 +1588,7 @@ function onVizDown(e){
         roOverride=-1;roIdx=0;el('runout').value=-1;
         el('dist').value=0;updateFlipClock(0);
         localStorage.removeItem('pc_dragged');localStorage.removeItem('pc_snapped');localStorage.removeItem('pc_adjusted');
+        pendingM1Sensor=false;
         syncStoEngine();calc();drawHomeViz();
         if(navigator.vibrate)navigator.vibrate([30,20,30]);
         activateSensorForZone(0); // M1 — no timeout, wait indefinitely
@@ -1677,9 +1678,9 @@ function onVizMove(e){
     ballLocked=false;
     if(localStorage.getItem('pc_snapped'))localStorage.setItem('pc_adjusted','1');
     var nd=clamp(Math.round((vizDrag.sv+(p.y-vizDrag.sy)/vizSc)),1,80);
-    // First drag from zero → activate M1 sensor immediately while still dragging
+    // Set flag — sensor activates in onVizUp (touchend = valid iOS gesture)
     if(vizDrag.sv===0&&nd>0&&!sensorLive){
-      activateSensorForZone(0);
+      pendingM1Sensor=true;
     }
     if(nd!==S.dist){S.dist=nd;drumDist=nd;el('dist').value=nd;updateFlipClock(nd);}
     drawHomeViz();autoSnapViz();return;
@@ -1712,6 +1713,11 @@ function onVizMove(e){
 function onVizUp(e){
   if(vizLongPress){clearTimeout(vizLongPress);vizLongPress=null;}
   if(vizDrag){vizDrag=null;calc();}
+  // Activate M1 sensor here — touchend is valid iOS gesture for requestPermission
+  if(pendingM1Sensor&&S.dist>0&&!sensorLive){
+    pendingM1Sensor=false;
+    activateSensorForZone(0);
+  }
 }
 
 // ── Zone management ───────────────────────────────────────────────────────────
@@ -1895,7 +1901,7 @@ async function storageGet(k){try{if(window.storage){var r=await window.storage.g
 var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=0.2,SAMPLE_MS=100;
 var lastB=null,lastGamma=null,sensorTarget=null;
 var sensorLive=null,sensorLiveTimer=null,sensorBreathRAF=null;
-var sensorLiveTapRuler={idx:-1,t:0},pendingM1Dist=0,sensorPermGranted=false;
+var sensorLiveTapRuler={idx:-1,t:0},pendingM1Dist=0,sensorPermGranted=false,pendingM1Sensor=false;
 var _ac=null,_keepAlive=null;
 function getAC(){if(!_ac){try{_ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return _ac;}
 function startAudioKeepAlive(){
