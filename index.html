@@ -1997,31 +1997,13 @@ function getSlope(beta,gamma){
   }
   return{fwd:fwd,cross:cross};
 }
-var sensorPermGranted=false;
-var pendingM1Sensor=false;
-function requestSensorPerm(){
-  // Call this from any direct touch handler — iOS requires synchronous call within gesture
-  if(sensorPermGranted)return;
+function startSensor(cb){
+  if(sensorOn){if(cb)cb();return;}
   if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
     DeviceOrientationEvent.requestPermission().then(function(r){
-      sensorPermGranted=(r==='granted');
+      if(r==='granted'){sensorPermGranted=true;startSensorAlways();if(cb)cb();}
     }).catch(function(){});
-  }else{
-    sensorPermGranted=true;
-  }
-}
-function startSensor(cb){
-  var go=function(){
-    sensorOn=true;
-    if(oriHandler)window.removeEventListener('deviceorientation',oriHandler);
-    oriHandler=function(e){if(e.beta===null)return;lastB=e.beta||0;lastGamma=e.gamma||0;};
-    window.addEventListener('deviceorientation',oriHandler);
-    if(cb)cb();
-  };
-  if(sensorPermGranted){go();}
-  else if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
-    DeviceOrientationEvent.requestPermission().then(function(r){if(r==='granted'){sensorPermGranted=true;go();}}).catch(function(){});
-  }else{sensorPermGranted=true;go();}
+  }else{sensorPermGranted=true;startSensorAlways();if(cb)cb();}
 }
 function startStabTimer(){
   if(stabTimer)clearInterval(stabTimer);
