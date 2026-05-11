@@ -1604,6 +1604,9 @@ function onVizDown(e){
         el('dist').value=0;updateFlipClock(0);
         localStorage.removeItem('pc_dragged');localStorage.removeItem('pc_snapped');localStorage.removeItem('pc_adjusted');
         pendingM1Sensor=false;
+        // Explicitly zero engine slopes
+        el('xslope')&&(el('xslope').value=0);
+        el('fslope')&&(el('fslope').value=0);
         syncStoEngine();calc();drawHomeViz();
         if(navigator.vibrate)navigator.vibrate([30,20,30]);
         activateSensorForZone(0); // M1 — no timeout, wait indefinitely
