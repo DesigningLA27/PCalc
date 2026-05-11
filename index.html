@@ -1128,10 +1128,10 @@ function autoSnapViz(){
       if(!m1Captured){
         m1Dist=third;
         S.bounds=[third];
-        S.zones=[{xs:S.zones[0]?S.zones[0].xs:0,fwd:S.zones[0]?S.zones[0].fwd:0},{xs:0,fwd:0}];
-        zone=true;S.m1Active=true;
+        S.zones=[{xs:0,fwd:0},{xs:0,fwd:0}];
+        // Don't activate zone/curve yet — wait for sensor to confirm slopes
+        zone=false;S.m1Active=false;
       } else {
-        // Still update M1 proportionally if not manually dragged
         m1Dist=third;
         if(S.bounds.length>0)S.bounds[0]=third;
       }
@@ -2068,10 +2068,9 @@ function onStable(r){
   if(zi===null)return;
   var fwd=Math.round(clamp(r.fwd,-6,6)*2)/2,xs=Math.round(clamp(r.cross,-5,5)*2)/2;
   if(zi===0){
-    // Update M1 slopes only — keep ruler/bounds that autoSnapViz already set
     if(!S.zones[0])S.zones[0]={xs:0,fwd:0};
     S.zones[0]={xs:xs,fwd:fwd};
-    m1Captured=true;S.m1Active=true;
+    m1Captured=true;S.m1Active=true;zone=true; // activate now that we have slopes
     pendingM1Dist=Math.max(1,Math.round(S.dist/3));
     sensorTarget=null;
     syncStoEngine();calc();drawHomeViz();
