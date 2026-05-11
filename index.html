@@ -280,6 +280,12 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
   </div>
   <!-- SENSOR DEBUG — remove later -->
   <div id="sdbg" style="position:fixed;bottom:80px;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font:bold 16px monospace;padding:8px 12px;z-index:9999;text-align:center">sensor: init</div>
+  <!-- One-time sensor permission overlay -->
+  <div id="sensor-gate" style="display:none;position:fixed;inset:0;background:rgba(2,48,71,0.96);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
+    <div style="color:#8ECAE6;font-family:'Barlow Condensed',sans-serif;font-size:18px;letter-spacing:2px;text-align:center">PUTTCALC NEEDS<br>MOTION ACCESS</div>
+    <button id="sensor-gate-btn" style="background:#2a7ab8;color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;letter-spacing:2px;border:none;border-radius:30px;padding:16px 48px;-webkit-tap-highlight-color:transparent">ENABLE SENSOR</button>
+    <div style="color:#8ECAE6;font-size:13px;opacity:0.7">Only asked once</div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════
@@ -1943,6 +1949,21 @@ function requestSensorPerm(){
     sensorPermGranted=true;startSensorAlways();
   }
 }
+function showSensorGate(){
+  var gate=el('sensor-gate');
+  if(gate)gate.style.display='flex';
+}
+function onSensorGateTap(){
+  var gate=el('sensor-gate');
+  if(gate)gate.style.display='none';
+  localStorage.setItem('pc_sensorGranted','1');
+  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().then(function(r){
+      var d=el('sdbg');if(d)d.textContent='permission: '+r;
+      if(r==='granted'){sensorPermGranted=true;startSensorAlways();}
+    }).catch(function(err){var d=el('sdbg');if(d)d.textContent='error: '+err;});
+  }else{sensorPermGranted=true;startSensorAlways();}
+}
 // Global AudioContext — must be created/unlocked via user gesture on iOS
 var _ac=null;
 function getAC(){
@@ -2097,6 +2118,24 @@ window.addEventListener('load',function(){
     window.addEventListener('mouseup',onVizUp);
     window.addEventListener('touchend',onVizUp);
     window.addEventListener('resize',function(){layoutViz();drawHomeViz();});
+  }
+  // Wire sensor gate button
+  var gateBtn=el('sensor-gate-btn');
+  if(gateBtn){
+    gateBtn.addEventListener('touchend',function(e){e.stopPropagation();onSensorGateTap();},{passive:true});
+    gateBtn.addEventListener('click',onSensorGateTap);
+  }
+  // Show gate if permission not yet granted
+  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+    if(!localStorage.getItem('pc_sensorGranted')){
+      showSensorGate();
+    }else{
+      // Already granted before — start sensor directly
+      startSensorAlways();
+    }
+  }else{
+    // No permission API needed
+    startSensorAlways();
   }
 });
 
