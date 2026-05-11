@@ -1132,6 +1132,12 @@ function autoSnapViz(){
     }
     syncStoEngine();
     calc();
+    // Auto-take M1 reading 2s after ball locks — sensor always running
+    if(S.dist>0&&!m1Captured){
+      sensorLive='M1';sensorTarget=0;stabBufLocal=[];
+      if(stabTimer)clearInterval(stabTimer);
+      startStabTimer();
+    }
   },1500);
 }
 
@@ -1903,18 +1909,29 @@ async function storageGet(k){try{if(window.storage){var r=await window.storage.g
 // ── Sensor ────────────────────────────────────────────────────────────────────
 var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=3.0,SAMPLE_MS=100;
 var lastB=null,lastGamma=null,sensorTarget=null;
-// Live sensor flow state
-var sensorLive=null;
-var sensorLiveTimer=null;
-var sensorBreathRAF=null;
-var sensorLiveTapRuler={idx:-1,t:0};
-var pendingM1Dist=0;
-var flipWait=true; // default ON — wait for face-down before stabilising
-function toggleFlipWait(){
-  flipWait=!flipWait;
-  var sw=el('flip-wait-sw');
-  if(sw)sw.className='sw-sm'+(flipWait?' on':'');
-  localStorage.setItem('pc_flipWait',JSON.stringify(flipWait));
+var sensorLive=null,sensorLiveTimer=null,sensorBreathRAF=null;
+var sensorLiveTapRuler={idx:-1,t:0},pendingM1Dist=0;
+var sensorPermGranted=false,pendingM1Sensor=false;
+var flipWait=false; // OFF — don't require face-down for this test
+function toggleFlipWait(){flipWait=!flipWait;}
+// Start sensor event listener — called from first touch (valid iOS gesture)
+function startSensorAlways(){
+  if(sensorOn)return;
+  if(oriHandler)window.removeEventListener('deviceorientation',oriHandler);
+  oriHandler=function(e){
+    lastB=e.beta!==null?e.beta:lastB;
+    lastGamma=e.gamma!==null?e.gamma:lastGamma;
+  };
+  window.addEventListener('deviceorientation',oriHandler);
+  sensorOn=true;
+}
+function requestSensorPerm(){
+  if(sensorOn)return;
+  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().then(function(r){
+      if(r==='granted'){sensorPermGranted=true;startSensorAlways();}
+    }).catch(function(){});
+  }else{sensorPermGranted=true;startSensorAlways();}
 }
 // Global AudioContext — must be created/unlocked via user gesture on iOS
 var _ac=null;
