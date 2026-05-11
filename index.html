@@ -1574,6 +1574,7 @@ function vizGetPos(e){
 }
 function onVizDown(e){
   e.preventDefault();
+  requestSensorPerm(); // cache permission from touchstart — valid iOS gesture
   var p=vizGetPos(e);
   // Double-tap hole → full reset + activate M1 sensor
   if(S.dist>0){
@@ -1893,6 +1894,13 @@ async function storageGet(k){try{if(window.storage){var r=await window.storage.g
 // ── Sensor ────────────────────────────────────────────────────────────────────
 var sensorOn=false,oriHandler=null,stabTimer=null,stabBufLocal=[],STAB_THR=0.8,SAMPLE_MS=100;
 var lastB=null,lastGamma=null,sensorTarget=null;
+var sensorPermGranted=false;
+function requestSensorPerm(){
+  if(sensorPermGranted)return;
+  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().then(function(r){sensorPermGranted=(r==='granted');}).catch(function(){});
+  }else{sensorPermGranted=true;}
+}
 // Live sensor flow state
 var sensorLive=null;          // null | 'M1' | 'M2' | 'M3'
 var sensorLiveTimer=null;     // 60-second window timeout
@@ -1951,7 +1959,12 @@ function activateSensorForZone(zi,timeout){
   sensorBreathRAF=requestAnimationFrame(breathTick);
 }
 function getSlope(beta,gamma){var fd=Math.abs(beta)>90,sgn=fd?-1:1,db=fd?(Math.abs(beta)-180)*Math.sign(beta):beta;return{fwd:parseFloat((Math.tan(db*Math.PI/180)*100*sgn).toFixed(1)),cross:parseFloat((-Math.tan(gamma*Math.PI/180)*100).toFixed(1))};}
-function startSensor(cb){var go=function(){sensorOn=true;if(oriHandler)window.removeEventListener('deviceorientation',oriHandler);oriHandler=function(e){if(e.beta===null)return;lastB=e.beta||0;lastGamma=e.gamma||0;};window.addEventListener('deviceorientation',oriHandler);if(cb)cb();};if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){DeviceOrientationEvent.requestPermission().then(function(r){if(r==='granted')go();}).catch(function(){});}else go();}
+function startSensor(cb){
+  var go=function(){sensorOn=true;if(oriHandler)window.removeEventListener('deviceorientation',oriHandler);oriHandler=function(e){if(e.beta===null)return;lastB=e.beta||0;lastGamma=e.gamma||0;};window.addEventListener('deviceorientation',oriHandler);if(cb)cb();};
+  if(sensorPermGranted){go();}
+  else if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){DeviceOrientationEvent.requestPermission().then(function(r){if(r==='granted'){sensorPermGranted=true;go();}}).catch(function(){});}
+  else{sensorPermGranted=true;go();}
+}
 function startStabTimer(){if(stabTimer)clearInterval(stabTimer);stabBufLocal=[];stabTimer=setInterval(function(){if(lastB===null||sensorTarget===null)return;var r=getSlope(lastB,lastGamma);stabBufLocal.push(r);var need=Math.round((vn('stab-win')||2)*1000/SAMPLE_MS);if(stabBufLocal.length>need)stabBufLocal.shift();if(stabBufLocal.length>=need){var fs2=stabBufLocal.map(function(s){return s.fwd;}),cs=stabBufLocal.map(function(s){return s.cross;});if(Math.max.apply(null,fs2)-Math.min.apply(null,fs2)<=STAB_THR&&Math.max.apply(null,cs)-Math.min.apply(null,cs)<=STAB_THR){clearInterval(stabTimer);stabTimer=null;onStable({fwd:fs2.reduce(function(a,b){return a+b;},0)/fs2.length,cross:cs.reduce(function(a,b){return a+b;},0)/cs.length});}}},SAMPLE_MS);}
 function onStable(r){
   if(navigator.vibrate)navigator.vibrate([60,30,60]);
