@@ -94,6 +94,20 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
 .h-drum-u{font-size:11px;font-weight:600;letter-spacing:.15em;color:#5a8ca8;text-align:center;text-transform:uppercase;font-family:'DM Mono',monospace;margin-top:2px}
 
 /* ── Distance number animation ── */
+@keyframes holePulse{
+  0%{box-shadow:0 0 0 0 rgba(233,196,106,0.8);}
+  100%{box-shadow:0 0 0 22px rgba(233,196,106,0);}
+}
+#sonar-pulse{
+  position:absolute;
+  width:26px;height:26px;
+  border-radius:50%;
+  background:rgba(233,196,106,0.0);
+  animation:holePulse 0.75s ease-out infinite;
+  display:none;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+}
 @keyframes valPulse{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
 .hc-val.changed{animation:valPulse 0.2s ease-in-out}
 .h-viz{flex:1;min-height:0;max-height:100%;position:relative;overflow:hidden;background:#daeaf4}
@@ -277,6 +291,7 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
   <!-- Interactive SVG visualization -->
   <div class="h-viz" id="h-viz-wrap" style="position:relative">
     <canvas id="home-viz"></canvas>
+    <div id="sonar-pulse"></div>
   </div>
   <!-- One-time sensor permission overlay -->
   <div id="sensor-gate" style="display:none;position:fixed;inset:0;background:rgba(2,48,71,0.96);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">
@@ -384,15 +399,16 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
   <div class="sg">Round data</div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Handicap index</span><span class="sx" id="hcp-display">Scratch</span></div><div class="si-row"><button class="si-rst" onclick="rst('hcp')">&#x21BA;</button><button class="si-btn" onclick="ss('hcp',-1)">&#x2212;</button><input class="si" type="text" id="hcp" data-num="0" data-min="-5" data-max="54" value="0" style="width:56px" oninput="syncHcpFromText();updateHcpDisplay();calc()"><button class="si-btn" onclick="ss('hcp',1)">+</button></div></div>
   <div class="sg">Green conditions</div>
-  <div class="sr-row"><div class="sw-col"><span class="sn">Stimp rating</span></div><div class="si-row"><button class="si-rst" onclick="rst('stimp')">&#x21BA;</button><button class="si-btn" onclick="ss('stimp',-0.5)">&#x2212;</button><input class="si" type="number" id="stimp" value="9" min="6" max="15" step="0.5" oninput="calc()"><button class="si-btn" onclick="ss('stimp',0.5)">+</button></div></div>
+  <div class="sr-row"><div class="sw-col"><span class="sn">Stimp rating</span></div><div class="si-row"><button class="si-rst" onclick="rst('stimp')">&#x21BA;</button><button class="si-btn" onclick="ss('stimp',-0.5)">&#x2212;</button><input class="si" type="number" id="stimp" value="10" min="6" max="15" step="0.5" oninput="calc()"><button class="si-btn" onclick="ss('stimp',0.5)">+</button></div></div>
   <div class="sg">Stroke reference</div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Ref backswing (in)</span></div><div class="si-row"><button class="si-rst" onclick="rst('ref-bs')">&#x21BA;</button><button class="si-btn" onclick="ss('ref-bs',-0.5)">&#x2212;</button><input class="si" type="number" id="ref-bs" value="12" step="0.5" oninput="calc()"><button class="si-btn" onclick="ss('ref-bs',0.5)">+</button></div></div>
-  <div class="sr-row"><div class="sw-col"><span class="sn">Ref stimp</span></div><div class="si-row"><button class="si-rst" onclick="rst('ref-st')">&#x21BA;</button><button class="si-btn" onclick="ss('ref-st',-0.5)">&#x2212;</button><input class="si" type="number" id="ref-st" value="9" step="0.5" oninput="calc()"><button class="si-btn" onclick="ss('ref-st',0.5)">+</button></div></div>
+  <div class="sr-row"><div class="sw-col"><span class="sn">Ref stimp</span></div><div class="si-row"><button class="si-rst" onclick="rst('ref-st')">&#x21BA;</button><button class="si-btn" onclick="ss('ref-st',-0.5)">&#x2212;</button><input class="si" type="number" id="ref-st" value="10" step="0.5" oninput="calc()"><button class="si-btn" onclick="ss('ref-st',0.5)">+</button></div></div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Ref distance (ft)</span></div><div class="si-row"><button class="si-rst" onclick="rst('ref-di')">&#x21BA;</button><button class="si-btn" onclick="ss('ref-di',-1)">&#x2212;</button><input class="si" type="number" id="ref-di" value="20" step="1" oninput="calc()"><button class="si-btn" onclick="ss('ref-di',1)">+</button></div></div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Ref run-out (in)</span></div><div class="si-row"><button class="si-rst" onclick="rst('ref-ro')">&#x21BA;</button><button class="si-btn" onclick="ss('ref-ro',-6)">&#x2212;</button><input class="si" type="number" id="ref-ro" value="0" min="0" max="24" step="6" oninput="calc()"><button class="si-btn" onclick="ss('ref-ro',6)">+</button></div></div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Tempo (s)</span></div><div class="si-row"><button class="si-rst" onclick="rst('tempo')">&#x21BA;</button><button class="si-btn" onclick="ss('tempo',-0.05)">&#x2212;</button><input class="si" type="number" id="tempo" value="0.9" min="0.3" max="3.0" step="0.05" oninput="calc()"><button class="si-btn" onclick="ss('tempo',0.05)">+</button></div></div>
   <div class="sg">Break calibration</div>
-  <div class="sr-row"><div class="sw-col"><span class="sn">Break multiplier</span><span class="sx">0.65 = typical</span></div><div class="si-row"><button class="si-rst" onclick="rst('brk-m')">&#x21BA;</button><button class="si-btn" onclick="ss('brk-m',-0.05)">&#x2212;</button><input class="si" type="number" id="brk-m" value="0.65" min="0.1" max="1.5" step="0.05" oninput="calc()"><button class="si-btn" onclick="ss('brk-m',0.05)">+</button></div></div>
+  <div class="sr-row"><div class="sw-col"><span class="sn">Grass type</span><span class="sx">adjusts break multiplier</span></div><div class="si-row"><select class="si" id="grass-type" onchange="onGrassType()" style="width:120px;font-size:13px"><option value="0.70">Bent</option><option value="0.65">Poa Annua</option><option value="0.80">Bermuda</option><option value="0.82">Paspalum</option><option value="custom">Custom</option></select></div></div>
+  <div class="sr-row"><div class="sw-col"><span class="sn">Break multiplier</span><span class="sx">0.70 = standard bent grass stimp 10</span></div><div class="si-row"><button class="si-rst" onclick="rst('brk-m')">&#x21BA;</button><button class="si-btn" onclick="ss('brk-m',-0.05)">&#x2212;</button><input class="si" type="number" id="brk-m" value="0.70" min="0.1" max="1.5" step="0.05" oninput="onBrkMChanged()"><button class="si-btn" onclick="ss('brk-m',0.05)">+</button></div></div>
   <div class="sr-row"><div class="sw-col"><span class="sn">M1 zone amplifier</span></div><div class="si-row"><button class="si-rst" onclick="rst('z1amp')">&#x21BA;</button><button class="si-btn" onclick="ss('z1amp',-0.1)">&#x2212;</button><input class="si" type="number" id="z1amp" value="1.0" min="0.5" max="2.0" step="0.1" oninput="calc()"><button class="si-btn" onclick="ss('z1amp',0.1)">+</button></div></div>
   <div class="sg">Make rate model</div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Slope/break penalty</span><span class="sx">1.0 = standard</span></div><div class="si-row"><button class="si-rst" onclick="rst('spw')">&#x21BA;</button><button class="si-btn" onclick="ss('spw',-0.1)">&#x2212;</button><input class="si" type="number" id="spw" value="1.0" min="0" max="3.0" step="0.1" oninput="calc()"><button class="si-btn" onclick="ss('spw',0.1)">+</button></div></div>
@@ -411,7 +427,10 @@ body{font-family:'DM Sans',sans-serif;color:#0d2233}
   </select></div>
   <div class="sr-row"><div class="sw-col"><span class="sn">With-grain %</span></div><div class="si-row"><button class="si-btn" onclick="ss('g-with-pct',-1)">&#x2212;</button><input class="si" type="number" id="g-with-pct" value="0" min="0" max="50" step="1" oninput="calc()"><button class="si-btn" onclick="ss('g-with-pct',1)">+</button></div></div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Against-grain %</span></div><div class="si-row"><button class="si-btn" onclick="ss('g-agst-pct',-1)">&#x2212;</button><input class="si" type="number" id="g-agst-pct" value="0" min="0" max="50" step="1" oninput="calc()"><button class="si-btn" onclick="ss('g-agst-pct',1)">+</button></div></div>
-  <div class="sg">Sensor</div>
+  <div class="sg">AimPoint</div>
+  <div class="sr-row"><div class="sw-col"><span class="sn">Finger width (in)</span><div class="sh-s" style="font-size:10px;margin-top:2px">Hold index+middle finger together, measure across both, divide by 2</div></div><div class="si-row"><button class="si-rst" onclick="rst('finger-width')">&#x21BA;</button><button class="si-btn" onclick="ss('finger-width',-0.05)">&#x2212;</button><input class="si" type="number" id="finger-width" value="0.85" min="0.50" max="1.20" step="0.05" oninput="calc()"><button class="si-btn" onclick="ss('finger-width',0.05)">+</button></div></div>
+  <div class="sr-row"><div class="sw-col"><span class="sn">Eye to fingers (in)</span><div class="sh-s" style="font-size:10px;margin-top:2px">Arm straight out, fingers vertical, eyes to fingertips</div></div><div class="si-row"><button class="si-rst" onclick="rst('eye-dist')">&#x21BA;</button><button class="si-btn" onclick="ss('eye-dist',-1)">&#x2212;</button><input class="si" type="number" id="eye-dist" value="24" min="18" max="36" step="1" oninput="calc()"><button class="si-btn" onclick="ss('eye-dist',1)">+</button></div></div>
+  <div class="sr-row"><div class="sw-col"><span class="sn">Stand behind ball (ft)</span><div class="sh-s" style="font-size:10px;margin-top:2px">Distance behind ball when reading</div></div><div class="si-row"><button class="si-rst" onclick="rst('stand-back')">&#x21BA;</button><button class="si-btn" onclick="ss('stand-back',-1)">&#x2212;</button><input class="si" type="number" id="stand-back" value="3" min="1" max="8" step="1" oninput="calc()"><button class="si-btn" onclick="ss('stand-back',1)">+</button></div></div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Stability window (s)</span></div><div class="si-row"><button class="si-btn" onclick="ss('stab-win',-0.5)">&#x2212;</button><input class="si" type="number" id="stab-win" value="2.0" min="0.5" max="5.0" step="0.5"><button class="si-btn" onclick="ss('stab-win',0.5)">+</button></div></div>
   <div class="sr-row"><div class="sw-col"><span class="sn">Wait for flip (face down)</span><div class="sh-s" style="font-size:10px;margin-top:2px">Start measuring only after phone is flipped</div></div><div class="si-row"><button id="flip-wait-sw" class="sw-sm on" onclick="toggleFlipWait()"></button></div></div>
 </div>
@@ -513,8 +532,8 @@ var clamp=function(v,mn,mx){return Math.max(mn,Math.min(mx,v));};
 // ── Constants ────────────────────────────────────────────────────────────────
 var G=32.174,VSTIM=6.588,KWIND=0.00261;
 var XSM=5,FM=6,SXS=0.5,SF=0.5,HIT=28;
-var DEFS={'hcp':0,'stimp':9,'ref-bs':12,'ref-st':9,'ref-di':20,'ref-ro':0,
-  'tempo':0.9,'brk-m':0.65,'z1amp':1.0,'upf':1.55,'dnf':1.68,
+var DEFS={'hcp':0,'stimp':10,'finger-width':0.748,'eye-dist':24,'stand-back':3,'ref-bs':12,'ref-st':10,'ref-di':20,'ref-ro':0,
+  'tempo':0.9,'brk-m':0.70,'z1amp':1.0,'upf':1.55,'dnf':1.68,
   'g-with-pct':0,'g-agst-pct':0,'spw':1.0,'stab-win':2.0};
 
 // ── Zone state ───────────────────────────────────────────────────────────────
@@ -596,6 +615,31 @@ function threePuttPct(dist,hcp){
 function missLeave(d){if(d<=8)return 2.0;if(d<=20)return 2.5;if(d<=35)return 3.5;return 5.0;}
 function crossAddition(xm){xm=Math.abs(xm);if(xm<=1.5)return 0;return 0.75*Math.pow((xm-1.5)/1.5,1.6);}
 function effectiveCross(xs,fs){if(fs<=0)return Math.abs(xs);return Math.abs(xs)*(1-Math.min(0.75,fs/4.0));}
+function onGrassType(){
+  var sel=el('grass-type');if(!sel)return;
+  var val=sel.value;
+  if(val!=='custom'){
+    var inp=el('brk-m');if(inp){inp.value=val;}
+    calc();
+  }
+}
+function onBrkMChanged(){
+  // If user manually changes multiplier, set grass type to custom
+  var sel=el('grass-type');
+  if(sel){
+    var cur=parseFloat(sel.value);
+    var bm=parseFloat(el('brk-m').value);
+    if(Math.abs(cur-bm)>0.01)sel.value='custom';
+  }
+  calc();
+}
+function fingersFromBreak(breakInches,distFt){
+  var fw=vn('finger-width')||0.748;
+  var eyeD=vn('eye-dist')||24;
+  var standBack=vn('stand-back')||3;
+  var totalIn=(distFt+standBack)*12;
+  return Math.max(0,breakInches*eyeD/(fw*totalIn));
+}
 function forwardModifier(stimp,fs){
   if(fs>=-1.5)return 1.0;
   var fsa=Math.abs(fs),af=VSTIM*VSTIM/(2*stimp);
@@ -730,10 +774,11 @@ function numericalBreak(stimp,dist,zSlopes,zFwds,zBounds,ro,bm,z1a,gm,xd){
   return y*12*bm/INTEG_SCALE;
 }
 function spdCalc(stimp,dist,fwd,roIn,gm,xd,pace){
-  var af=VSTIM*VSTIM/(2*stimp)*gm;
+  // mu = 18/(G*stimp), so mu*G = 18/stimp
+  var af=18/stimp*gm;
   var sr=G*Math.sin(Math.atan(Math.abs(fwd)/100));
-  var sf=(!pace||fwd===0)?1:(fwd>0?(vn('upf')||1.55):(vn('dnf')||1.68));
-  var ae=af+sf*sr*(fwd>=0?1:-1)+(xd||0);
+  var ae=af+sr*(fwd>=0?1:-1);
+  ae+=(xd||0);
   if(ae<=0)return null;
   var rf=roIn/12,ve=rf>0?Math.sqrt(2*ae*rf):0;
   return{mph:Math.sqrt(ve*ve+2*ae*dist)*(3600/5280),vi:Math.sqrt(ve*ve+2*ae*dist),ae:ae};
@@ -878,47 +923,52 @@ function calc(){
   var refDi=vn('ref-di')||20,refRo=vn('ref-ro')||0;
   var bm=vn('brk-m')||0.65,z1a=vn('z1amp')||1.0,tempo=vn('tempo')||0.9;
   var warn=el('warning'),wnd=windFx(dist,stimp,fs,ro);
-  var ar=VSTIM*VSTIM/(2*refSt);
+  var ar=18/refSt;
   el('runout').value=ro;
-  var afg=VSTIM*VSTIM/(2*stimp)*gm,_u=vn('upf')||1.55,_d=vn('dnf')||1.68;
+  var afg=18/stimp*gm,_u=vn('upf')||1.55,_d=vn('dnf')||1.68;
   var cur,bt=0,fd,ae1S=0,ae2S=0;
 
   if(zone2&&S.zones.length>=3){
     var z1f=vn('z1fs'),z1x=vn('z1xs'),z2f=vn('z2fs'),z2x=vn('z2xs');
-    var d1=Math.max(0.1,m1Dist),d2=Math.max(0.1,m2Dist-m1Dist),d3=Math.max(0.1,dist-m2Dist);
-    var ae1=afg+(fs===0?1:(fs>0?_u:_d))*G*Math.sin(Math.atan(Math.abs(fs)/100))*(fs>=0?1:-1)+wnd.xd;
-    var ae2=afg+(z1f===0?1:(z1f>0?_u:_d))*G*Math.sin(Math.atan(Math.abs(z1f)/100))*(z1f>=0?1:-1)+wnd.xd;
-    var ae3=afg+(z2f===0?1:(z2f>0?_u:_d))*G*Math.sin(Math.atan(Math.abs(z2f)/100))*(z2f>=0?1:-1)+wnd.xd;
+    var b1=Math.max(0.1,(m1Dist+m2Dist)/2);
+    var b2=Math.max(b1+0.1,(m2Dist+dist)/2);
+    var d1=b1,d2=Math.max(0.1,b2-b1),d3=Math.max(0.1,dist-b2);
+    var _af=18/stimp*gm;
+    var ae1=_af+G*Math.sin(Math.atan(Math.abs(fs)/100))*(fs>=0?1:-1)+wnd.xd;
+    var ae2=_af+G*Math.sin(Math.atan(Math.abs(z1f)/100))*(z1f>=0?1:-1)+wnd.xd;
+    var ae3=_af+G*Math.sin(Math.atan(Math.abs(z2f)/100))*(z2f>=0?1:-1)+wnd.xd;
     if(ae1<=0||ae2<=0||ae3<=0){if(warn){warn.textContent='Gravity exceeds friction';warn.className='warn show';}return;}
     var rf=ro/12,ve1=rf>0?Math.sqrt(2*ae1*rf):0;
     var vi1=Math.sqrt(ve1*ve1+2*ae1*d1),vi2=Math.sqrt(vi1*vi1+2*ae2*d2),vi3=Math.sqrt(vi2*vi2+2*ae3*d3);
     cur={mph:vi3*(3600/5280),vi:vi3,ae:ae3};ae1S=ae1;ae2S=ae2;
     var z2xEff=z2x!==0?z2x:xs;
-    bt=numericalBreak(stimp,dist,[xs,z1x,z2xEff],[fs,z1f,z2f],[m1Dist,m2Dist],ro,bm,z1a,gm,wnd.xd);
-    var ae1p=Math.max(0.01,afg+G*Math.sin(Math.atan(Math.abs(fs)/100))*(fs>=0?1:-1)+wnd.xd);
-    var ae2p=Math.max(0.01,afg+G*Math.sin(Math.atan(Math.abs(z1f)/100))*(z1f>=0?1:-1)+wnd.xd);
-    var ae3p=Math.max(0.01,afg+G*Math.sin(Math.atan(Math.abs(z2f)/100))*(z2f>=0?1:-1)+wnd.xd);
+    bt=numericalBreak(stimp,dist,[xs,z1x,z2xEff],[fs,z1f,z2f],[b1,b2],ro,bm,z1a,gm,wnd.xd);
+    var ae1p=Math.max(0.01,_af+G*Math.sin(Math.atan(Math.abs(fs)/100))*(fs>=0?1:-1)+wnd.xd);
+    var ae2p=Math.max(0.01,_af+G*Math.sin(Math.atan(Math.abs(z1f)/100))*(z1f>=0?1:-1)+wnd.xd);
+    var ae3p=Math.max(0.01,_af+G*Math.sin(Math.atan(Math.abs(z2f)/100))*(z2f>=0?1:-1)+wnd.xd);
     var ve1p=rf>0?Math.sqrt(2*ae1p*rf):0;
     var vi1p=Math.sqrt(ve1p*ve1p+2*ae1p*d1),vi2p=Math.sqrt(vi1p*vi1p+2*ae2p*d2),vi3p=Math.sqrt(vi2p*vi2p+2*ae3p*d3);
     fd=vi3p*vi3p/(2*ar);lastZ2F=z2f;lastZ2X=z2x;
-  } else if(zone&&S.zones.length>=2){
+  } else if(zone&&S.zones.length>=2&&zone2){
+    // M1 + M2: genuine 2-zone putt
     var z1f=vn('z1fs'),z1x=vn('z1xs');
-    var d1=Math.max(0.1,m1Dist),d2=Math.max(0.1,dist-m1Dist);
-    var ae1=afg+(fs===0?1:(fs>0?_u:_d))*G*Math.sin(Math.atan(Math.abs(fs)/100))*(fs>=0?1:-1)+wnd.xd;
-    var ae2=afg+(z1f===0?1:(z1f>0?_u:_d))*G*Math.sin(Math.atan(Math.abs(z1f)/100))*(z1f>=0?1:-1)+wnd.xd;
+    var b1=Math.max(0.1,(m1Dist+m2Dist)/2);
+    var d1=b1,d2=Math.max(0.1,dist-b1);
+    var _af2=18/stimp*gm;
+    var ae1=_af2+G*Math.sin(Math.atan(Math.abs(fs)/100))*(fs>=0?1:-1)+wnd.xd;
+    var ae2=_af2+G*Math.sin(Math.atan(Math.abs(z1f)/100))*(z1f>=0?1:-1)+wnd.xd;
     if(ae1<=0||ae2<=0){if(warn){warn.textContent='Gravity exceeds friction';warn.className='warn show';}return;}
     var rf=ro/12,ve1=rf>0?Math.sqrt(2*ae1*rf):0;
     var vi1=Math.sqrt(ve1*ve1+2*ae1*d1),vi2=Math.sqrt(vi1*vi1+2*ae2*d2);
     cur={mph:vi2*(3600/5280),vi:vi2,ae:ae2};ae1S=ae1;ae2S=ae2;
-    // When only M1 (no M2), far zone inherits near-hole xs for uniform slope
-    var z1xBrk=zone2?z1x:xs;
-    bt=numericalBreak(stimp,dist,[xs,z1xBrk],[fs,z1f],[m1Dist],ro,bm,z1a,gm,wnd.xd);
-    var ae1p=Math.max(0.01,afg+G*Math.sin(Math.atan(Math.abs(fs)/100))*(fs>=0?1:-1)+wnd.xd);
-    var ae2p=Math.max(0.01,afg+G*Math.sin(Math.atan(Math.abs(z1f)/100))*(z1f>=0?1:-1)+wnd.xd);
+    bt=numericalBreak(stimp,dist,[xs,z1x],[fs,z1f],[b1],ro,bm,z1a,gm,wnd.xd);
+    var ae1p=Math.max(0.01,_af2+G*Math.sin(Math.atan(Math.abs(fs)/100))*(fs>=0?1:-1)+wnd.xd);
+    var ae2p=Math.max(0.01,_af2+G*Math.sin(Math.atan(Math.abs(z1f)/100))*(z1f>=0?1:-1)+wnd.xd);
     var ve1p=rf>0?Math.sqrt(2*ae1p*rf):0;
     var vi1p=Math.sqrt(ve1p*ve1p+2*ae1p*d1),vi2p=Math.sqrt(vi1p*vi1p+2*ae2p*d2);
     fd=vi2p*vi2p/(2*ar);lastZ2F=0;lastZ2X=0;
   } else {
+    // Single zone: M1-only OR no M1 — use full-distance single-zone physics with M1 slopes
     cur=spdCalc(stimp,dist,fs,ro,gm,wnd.xd,true);
     if(!cur){if(warn){warn.textContent='Gravity exceeds friction';warn.className='warn show';}return;}
     bt=brkCalc(stimp,dist,fs,xs,ro,bm);ae1S=cur.ae;ae2S=cur.ae;
@@ -944,18 +994,18 @@ function calc(){
   lastVI=cur.vi;lastAE=ae2S;lastAE1=ae1S;lastDist=dist;lastFS=fs;lastXS=xs;
   lastTot=tot;lastRO=ro;lastZ1F=zone?vn('z1fs'):0;lastZ1X=zone?vn('z1xs'):0;
   lastM1Dist=(zone||m1Captured)?m1Dist:0;lastM1Cap=m1Captured;
-  updateHomeDisplay(bs,fdS,cur.mph,baseMake,adjMake,baseTp,adjTp,adjEsho(),hcp,tot,fromCenter);
+  updateHomeDisplay(bs,fdS,cur.mph,baseMake,adjMake,baseTp,adjTp,adjEsho(),hcp,tot,fromCenter,xs);
   function adjEsho(){return Math.max(1.0,2-adjMake+adjTp);}
   drawHomeViz();
 }
 
 // ── AimPoint display ──────────────────────────────────────────────────────────
 var AIM_STATES=[
-  {lbl:'AimPoint',col:'#e9c46a',fn:function(fe){return fe>=0?fe.toFixed(1)+'"':'0"';}},
-  {lbl:'Fingers', col:'#A7C957',fn:function(fe){return (Math.max(0,fe)/10).toFixed(1)+'f';}},
-  {lbl:'High Line',col:'#e9c46a',fn:function(fe){return (Math.max(0,fe)*1.28).toFixed(1)+'"';}},
-  {lbl:'High Fng', col:'#F4845F',fn:function(fe){return ((Math.max(0,fe)*1.28)/10).toFixed(1)+'f';}},
-  {lbl:'Agg Line', col:'#E63946',fn:function(fe){return (Math.max(0,fe)*0.72).toFixed(1)+'"';}}
+  {lbl:'AimPoint',   col:'#e9c46a',fn:function(fe,slope,dist){return fe>=0?fe.toFixed(1)+'"':'0"';}},
+  {lbl:'Fingers',    col:'#A7C957',fn:function(fe,slope,dist){return fingersFromBreak(fe,dist).toFixed(1)+'f';}},
+  {lbl:'High Line',  col:'#e9c46a',fn:function(fe,slope,dist){return (Math.max(0,fe)*1.28).toFixed(1)+'"';}},
+  {lbl:'High Fingers',col:'#F4845F',fn:function(fe,slope,dist){return fingersFromBreak(fe*1.28,dist).toFixed(1)+'f';}},
+  {lbl:'Aggressive', col:'#E63946',fn:function(fe,slope,dist){return (Math.max(0,fe)*0.72).toFixed(1)+'"';}}
 ];
 var aimIdx=0;
 var aimSwipeX=null,aimSwipeMoved=false;
@@ -976,12 +1026,13 @@ function initAimSwipe(){
     var pt=(e.changedTouches?e.changedTouches[0]:e);
     var dx=pt.clientX-aimSwipeX;
     aimSwipeX=null;
-    if(!aimSwipeMoved&&Math.abs(dx)<8){
-      // Short tap — cycle forward
-      animateAim(1);return;
+    if(Math.abs(dx)>=20){
+      // Swipe — direction only, no tap
+      animateAim(dx<0?1:-1);
+    } else if(!aimSwipeMoved){
+      // Clean tap — cycle forward
+      animateAim(1);
     }
-    if(Math.abs(dx)<20)return;
-    animateAim(dx<0?1:-1);
   }
   el2.addEventListener('touchstart',onDown,{passive:true});
   el2.addEventListener('touchmove',onMove,{passive:true});
@@ -1057,7 +1108,7 @@ function initBsSwipe(){
 var RO_STEPS=[-1,0,6,12,18,24];var roIdx=0;
 function cycleRunOut(){roIdx=(roIdx+1)%RO_STEPS.length;roOverride=RO_STEPS[roIdx];el('runout').value=roOverride;calc();}
 
-function updateHomeDisplay(bs,pl,mph,make,adjMake,tp3,adjTp,adjEsho,hcp,tot,fromCenter){
+function updateHomeDisplay(bs,pl,mph,make,adjMake,tp3,adjTp,adjEsho,hcp,tot,fromCenter,xs){
   if(bs===null){
     bs=parseFloat((el('out-bs')||{}).textContent)||0;
     pl=parseFloat((el('out-pl')||{}).textContent)||0;
@@ -1084,7 +1135,8 @@ function updateHomeDisplay(bs,pl,mph,make,adjMake,tp3,adjTp,adjEsho,hcp,tot,from
   e=el('h-3putt-sub');if(e)e.textContent='of 15% (+'+(vn('hcp')||0)+')';
   var aim=AIM_STATES[aimIdx];
   var aimVal=fromCenter||0;
-  var aimFnResult=aim.fn(Math.max(0,aimVal));
+  var slopeAbs=Math.abs(xs||0);
+  var aimFnResult=aim.fn(Math.max(0,aimVal),slopeAbs,lastDist||S.dist||20);
   var aimConverted=parseFloat(aimFnResult)||0;
   var aimSuffix=aimFnResult.replace(/[0-9.-]/g,'')||'"';
   if(el('h-aim-val'))animateTopVal('h-aim-val','aim',aimConverted,1,aimSuffix);
@@ -1141,6 +1193,7 @@ function autoSnapViz(){
     // Auto-take M1 reading 2s after ball locks — sensor always running
     if(S.dist>0&&!m1Captured){
       sensorLive='M1';sensorTarget=0;stabBufLocal=[];
+      updateSonarPulse();
       if(stabTimer)clearInterval(stabTimer);
       startStabTimer();
     }
@@ -1170,7 +1223,7 @@ function layoutViz(){
   canvas.width=Math.round(vizW*dpr);canvas.height=Math.round(vizH*dpr);
   canvas.style.width=vizW+'px';canvas.style.height=vizH+'px';
   vizCtx=canvas.getContext('2d');vizCtx.scale(dpr,dpr);
-  vizLx=vizW/2;vizHy=52;vizBy=vizH-120;vizRH=vizW/2-52;
+  vizLx=vizW/2;vizHy=52;vizBy=vizH-120;vizRH=vizW*0.45-52;
 }
 
 function fy(ft){return vizHy+ft*vizSc;}
@@ -1329,7 +1382,7 @@ function vDrawDots(){
     var leftX=vizLx-vizRH,rightX=vizLx+vizRH;
     var blueDotX=dotOnRight?rightX:leftX;
     var blueDotY=ry-fwdOff;
-    blueDotY=Math.max(fy(topFt)+10,Math.min(ry-5,blueDotY));
+    blueDotY=Math.max(fy(topFt)+10,Math.min(vizBy-10,blueDotY));
 
     // Red M-dot
     vizCtx.fillStyle='#E63946';
@@ -1994,12 +2047,25 @@ function playBeep(){
     else{doBursts();}
   }catch(e){}
 }
+function updateSonarPulse(){
+  var pulse=el('sonar-pulse');
+  if(!pulse)return;
+  var canvas=el('home-viz');
+  if(sensorLive!==null&&canvas){
+    var scale=canvas.offsetWidth/canvas.width;
+    pulse.style.left=(vizLx*scale)+'px';
+    pulse.style.top=(vizHy*scale)+'px';
+    pulse.style.display='block';
+  }else{
+    pulse.style.display='none';
+  }
+}
 function clearSensorLive(){
   sensorLive=null;sensorTarget=null;
   if(sensorLiveTimer){clearTimeout(sensorLiveTimer);sensorLiveTimer=null;}
   if(stabTimer){clearInterval(stabTimer);stabTimer=null;}
   if(sensorBreathRAF){cancelAnimationFrame(sensorBreathRAF);sensorBreathRAF=null;}
-  drawHomeViz();
+  updateSonarPulse();drawHomeViz();
 }
 function activateSensorForZone(zi,timeout){
   if(sensorBreathRAF){cancelAnimationFrame(sensorBreathRAF);sensorBreathRAF=null;}
